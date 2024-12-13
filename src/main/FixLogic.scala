@@ -41,12 +41,13 @@ object FixLogic {
       .foldLeft[(Array[Coordinate], Double)](Array[Coordinate](), Double.NaN) {
         case ((accCoords, lastSlope), i) =>
           val pureSlope = getSlope(coordinates(i), coordinates(i+1))
-          val currSlope = BigDecimal(pureSlope).setScale(5, BigDecimal.RoundingMode.HALF_UP).toDouble
-          if(i == 0) (accCoords ++ Array(coordinates(i), coordinates(i+1)), currSlope)
+          val currSlope = if (pureSlope == Double.PositiveInfinity || pureSlope == Double.NegativeInfinity)
+            pureSlope
+          else
+            BigDecimal(pureSlope).setScale(5, BigDecimal.RoundingMode.HALF_UP).toDouble
+          if (i == 0) (accCoords ++ Array(coordinates(i), coordinates(i+1)), currSlope)
           else {
-
             val currFixedCoords = if (lastSlope == currSlope) accCoords.slice(0, accCoords.length - 1) else accCoords
-
             (currFixedCoords :+ coordinates(i+1), currSlope)
           }
       }._1

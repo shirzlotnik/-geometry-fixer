@@ -90,6 +90,25 @@
       <version>1.6.1-28.2</version>
       <scope>compile</scope>
     </dependency>
+
+    <dependency>
+      <groupId>io.circe</groupId>
+      <artifactId>circe-core_${scala.major.version}</artifactId>
+      <version>0.14.1</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.circe</groupId>
+      <artifactId>circe-generic_${scala.major.version}</artifactId>
+      <version>0.14.1</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.circe</groupId>
+      <artifactId>circe-parser_${scala.major.version}</artifactId>
+      <version>0.14.1</version>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
 
   <repositories>
