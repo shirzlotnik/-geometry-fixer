@@ -3,7 +3,7 @@ import shirzlotnik.GeoJson.GeoJson
 import org.apache.sedona.spark.SedonaContext
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.sedona_sql.expressions.st_constructors.ST_GeomFromGeoJSON
-import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Area, ST_Centroid}
+import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Area, ST_Centroid, ST_DumpPoints}
 import org.locationtech.jts.geom._
 import org.wololo.jts2geojson.GeoJSONReader
 import io.circe.parser.decode
@@ -69,6 +69,11 @@ object Main {
     }
   }
 
+
+  def GeometryCoordinatesLength(geometry: Geometry): Int = {
+    geometry.getCoordinates.length
+  }
+
   case class GeometryDF(geom: Geometry)
   case class GeoJsonDf(geoJson: String, id: String)
 
@@ -80,6 +85,7 @@ object Main {
 
     val getFixGeometry = udf(fixGeometry _)
     val getParsedGeometry = udf(parseGeoJsonToGeometry _)
+    val getGeometryCoordinatesLength = udf(GeometryCoordinatesLength _)
 
     val geoJSons = Seq(
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]}", "polygon1"),
@@ -99,6 +105,8 @@ object Main {
       .withColumn("fixed", getFixGeometry(col("geometry")))
       .withColumn("area", ST_Area(col("fixed")))
       .withColumn("centroid", ST_Centroid(col("fixed")))
+      .withColumn("original_coordinates", getGeometryCoordinatesLength(col("geometry")))
+      .withColumn("fixed_coordinates", getGeometryCoordinatesLength(col("fixed")))
 
 
     fixedPolygonsDF.show(false)
