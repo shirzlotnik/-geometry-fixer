@@ -26,7 +26,7 @@ object FixLogic {
     val boundary = polygon.getBoundary
     val fixedLinearRings = (0 until boundary.getNumGeometries)
       .map(boundary.getGeometryN(_).asInstanceOf[LinearRing])
-      .map(p1 => fixSelfIntersectWithCoordinates(p1, id))
+      .map(p1 => fixSelfIntersectOnExistCoordinate(p1, id))
       .map(p2 => fixCoordinatesDuplicates(p2, id))
       //      .map(fixRegularIntersection)
       .toArray
@@ -86,7 +86,7 @@ object FixLogic {
 
 
   // better option
-  def fixSelfIntersectWithCoordinates(linearRing: LinearRing, id: String): LinearRing = {
+  def fixSelfIntersectWithCoordinatesNo(linearRing: LinearRing, id: String): LinearRing = {
     val polygon = factory.createPolygon(linearRing)
     val fixedLinearRing = fixSelfIntersectWithCoordinates(polygon, id)
       .getBoundary.getGeometryN(0).asInstanceOf[LinearRing]
@@ -240,6 +240,38 @@ object FixLogic {
     }
   }
 
+
+  def buildNewCoordinates3(angleFromX: Double, coordinate: Coordinate, opposite: Int = 1):
+  (Coordinate, Coordinate) = {
+    val sinAngle = Math.sin(angleFromX)
+    val cosAngle = Math.cos(angleFromX)
+    val epsilon = 0.001
+
+
+    try {
+      if (sinAngle >= 0) { // I or II
+        if (cosAngle >= 0) { // I
+          (new Coordinate(coordinate.x + epsilon, coordinate.y + epsilon),
+            new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon))
+        } else { // II
+          (new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon),
+            new Coordinate(coordinate.x - epsilon, coordinate.y + epsilon))
+        }
+      } else { // III or IV
+        if (cosAngle >= 0) { // IV
+          (new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon),
+            new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon))
+        } else { // III
+          (new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon),
+            new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon))
+        }
+      }
+    } catch {
+      case e: Exception => println(e.getMessage)
+        println(e.getClass)
+        (coordinate, coordinate)
+    }
+  }
 
   def fixSelfIntersectOnExistCoordinate(polygon: Polygon, id: String): Polygon = {
     val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
