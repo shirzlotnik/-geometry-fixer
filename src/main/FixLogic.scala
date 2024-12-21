@@ -1,5 +1,5 @@
 import org.geotools.geometry.jts.JTS.makeValid
-import org.locationtech.jts.algorithm.Angle.{angleBetween, angleBetweenOriented, toDegrees}
+import org.locationtech.jts.algorithm.Angle.{angle, angleBetween, angleBetweenOriented, bisector, interiorAngle, toDegrees}
 import org.locationtech.jts.geom._
 
 object FixLogic {
@@ -84,6 +84,118 @@ object FixLogic {
     fixedLinearRing
   }
 
+  def fixSelfIntersectWithCoordinates(polygon: Polygon, id: String): Geometry = {
+    val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
+
+    val coordinatesArray = repaired.map(_.getCoordinates)
+    val problemCoords = coordinatesArray.tail.foldLeft[Array[Coordinate]](coordinatesArray.head)(
+      (accCoordsArray, currArray) => {
+      accCoordsArray.intersect(currArray)
+    }).head
+
+    val polygonsSplitCoords = repaired.map(_.getCoordinates).map(cs1 => {
+      val indexOfProblem = cs1.indexOf(problemCoords)
+      (cs1.slice(indexOfProblem, cs1.length), cs1.slice(0, indexOfProblem))
+    })
+
+    val newCoordinates = polygonsSplitCoords.zipWithIndex.foldLeft[Array[Coordinate]](Array[Coordinate]())(
+      (prevCoords, currCoordsTupleWithIndex) => {
+        val index = currCoordsTupleWithIndex._2
+        val (firstCoords, secondCoords) = currCoordsTupleWithIndex._1
+        val problemCoords = firstCoords.head
+
+        val angleFromX = if (prevCoords.isEmpty) {
+          val (firstPoint, secondPoint) = getFirstAndSecondPoints(firstCoords, secondCoords, prevCoords, problemCoords)
+          val p1 = angle(firstPoint, problemCoords)
+          val p2 = angle(problemCoords, secondPoint)
+          val p3 = p1 + p2
+          p3
+        } else {
+          val (firstPoint, secondPoint) = getFirstAndSecondPoints(firstCoords, secondCoords, prevCoords, problemCoords)
+          val p1 = angle(firstPoint, prevCoords.head)
+          val p2 = angle(prevCoords.head, secondPoint)
+          val p3 = p1 + p2
+          p3
+        }
+        val (changedCoords, changedCoordsOps) = buildNewCoordinates(angleFromX,
+          if (prevCoords.isEmpty) problemCoords else prevCoords(prevCoords.length - (index)))
+        val firstArray = if (prevCoords.isEmpty) Array[Coordinate](changedCoords) else prevCoords.slice(0, prevCoords.length - 1) :+ changedCoords
+        val lastArray = if (prevCoords.isEmpty) Array(changedCoords) else Array(changedCoordsOps, prevCoords.head)
+        val secondArray =  if (secondCoords.isEmpty) firstCoords.tail else firstCoords.slice(1, firstCoords.length - 1) ++ secondCoords
+
+         val pppp = firstArray ++ secondArray ++ lastArray
+
+        pppp
+      }
+    )
+
+    try {
+      val poly2 = factory.createPolygon(newCoordinates)
+      poly2
+    } catch {
+      case e: Exception => println(e.getMessage)
+        println(polygon)
+        println(id)
+        polygon
+    }
+  }
+
+  def getFirstAndSecondPoints(firstCoords: Array[Coordinate], secondCoords: Array[Coordinate],
+               prevCoords: Array[Coordinate], problemCoords: Coordinate): (Coordinate, Coordinate) = {
+    if (prevCoords.isEmpty) {
+      val arraysContainsProblem = if (firstCoords.contains(problemCoords)) (firstCoords, secondCoords) else (secondCoords, firstCoords)
+      val firstPoint = arraysContainsProblem._1(arraysContainsProblem._1.indexOf(problemCoords) + 1)
+      val secondPoint = if (arraysContainsProblem._2.isEmpty) {
+        arraysContainsProblem._1(arraysContainsProblem._1.length - 2)
+      } else {
+        arraysContainsProblem._2.last
+      }
+      (firstPoint, secondPoint)
+    } else {
+      val arraysContainsProblem = if (firstCoords.isEmpty) (prevCoords, secondCoords) else (prevCoords, firstCoords)
+      val firstPoint = arraysContainsProblem._1.head
+      val secondPoint = if (arraysContainsProblem._2.isEmpty) {
+        arraysContainsProblem._1(arraysContainsProblem._1.indexOf(problemCoords) + 1)
+      } else {
+        arraysContainsProblem._2(arraysContainsProblem._2.indexOf(problemCoords) + 1)
+      }
+      (firstPoint, secondPoint)
+    }
+  }
+
+  def buildNewCoordinates(angleFromX: Double, coordinate: Coordinate, opposite: Int = 1):
+  (Coordinate, Coordinate) = {
+    val sinAngle = Math.sin(angleFromX)
+    val cosAngle = Math.cos(angleFromX)
+    val epsilon = 0.001 * opposite
+
+
+    try {
+      if (sinAngle >= 0) { // I or II
+        if (cosAngle >= 0) { // I
+          (new Coordinate(coordinate.x + epsilon, coordinate.y + epsilon),
+            new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon))
+        } else { // II
+          (new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon),
+            new Coordinate(coordinate.x - epsilon, coordinate.y + epsilon))
+        }
+      } else { // III or IV
+        if (cosAngle >= 0) { // IV
+          (new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon),
+            new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon))
+        } else { // III
+          (new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon),
+            new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon))
+        }
+      }
+    } catch {
+      case e: Exception => println(e.getMessage)
+        println(e.getClass)
+        (coordinate, coordinate)
+    }
+  }
+
+
   def fixSelfIntersectOnExistCoordinate(polygon: Polygon, id: String): Polygon = {
     val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
 
@@ -97,17 +209,18 @@ object FixLogic {
 
             val problemCoord = accCoords.find(currCoords.contains)
             val indexProblem = accCoords.indexOf(problemCoord.get)
+            val indexForCurrPolygonProblem = currCoords.indexOf(problemCoord.get)
 
             val currPolygonCoordinates = if (indexProblem == 0) {
               accCoords.slice(1, accCoords.length - 1)
             } else accCoords
 
             val coordinatesToAddPolygon = (if (currIndex % 2 != 0) {
-              currCoords.slice(indexProblem, currCoords.length) ++
-                currCoords.slice(0, indexProblem)
+              currCoords.slice(indexForCurrPolygonProblem, currCoords.length) ++
+                currCoords.slice(0, indexForCurrPolygonProblem)
             } else {
-              (currCoords.slice(0, indexProblem) ++
-                currCoords.slice(indexProblem, currCoords.length))
+              (currCoords.slice(0, indexForCurrPolygonProblem) ++
+                currCoords.slice(indexForCurrPolygonProblem, currCoords.length))
             })
             val indexProblemCurr = coordinatesToAddPolygon.indexOf(problemCoord.get)
 
