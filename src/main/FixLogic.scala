@@ -1,5 +1,5 @@
 import org.geotools.geometry.jts.JTS.makeValid
-import org.locationtech.jts.algorithm.Angle.{angleBetweenOriented, toDegrees}
+import org.locationtech.jts.algorithm.Angle.{angleBetween, angleBetweenOriented, toDegrees}
 import org.locationtech.jts.geom._
 
 object FixLogic {
@@ -13,29 +13,39 @@ object FixLogic {
     }
   }
 
-  def fixCoordinatesDuplicates(multiPolygon: MultiPolygon): MultiPolygon = {
+  def fixCoordinatesDuplicates(multiPolygon: MultiPolygon, id: String): MultiPolygon = {
     val fixedPolygons = (0 until multiPolygon.getNumGeometries)
       .map(multiPolygon.getGeometryN(_).asInstanceOf[Polygon])
-      .map(fixCoordinatesDuplicates)
+      .map(p => fixCoordinatesDuplicates(p, id))
       .toArray
 
     factory.createMultiPolygon(fixedPolygons)
   }
 
-  def fixCoordinatesDuplicates(polygon: Polygon): Polygon = {
+  def fixCoordinatesDuplicates(polygon: Polygon, id: String): Polygon = {
     val boundary = polygon.getBoundary
     val fixedLinearRings = (0 until boundary.getNumGeometries)
       .map(boundary.getGeometryN(_).asInstanceOf[LinearRing])
-      .map(fixCoordinatesDuplicates)
+      .map(p1 => fixSelfIntersectOnExistCoordinate(p1, id))
+      .map(p2 => fixCoordinatesDuplicates(p2, id))
+      //      .map(fixRegularIntersection)
       .toArray
 
-    if (fixedLinearRings.length == 1) factory.createPolygon(fixedLinearRings.head)
-    else if (fixedLinearRings.length > 1) factory.createPolygon(fixedLinearRings.head, fixedLinearRings.tail)
-    else polygon
+    try {
+      if (fixedLinearRings.length == 1) factory.createPolygon(fixedLinearRings.head)
+      else if (fixedLinearRings.length > 1) factory.createPolygon(fixedLinearRings.head, fixedLinearRings.tail)
+      else polygon
+    } catch {
+      case e: Exception => println(e.getMessage + " line 39")
+        println(polygon)
+        println(polygon.toString)
+        println(id)
+        polygon
+    }
   }
 
 
-  def fixCoordinatesDuplicates(linearRing: LinearRing): LinearRing = {
+  def fixCoordinatesDuplicates(linearRing: LinearRing, id: String): LinearRing = {
     val coordinates = linearRing.getCoordinates
     val geometryFactory = new GeometryFactory()
 
@@ -54,97 +64,127 @@ object FixLogic {
           }
       }._1
 
-    val newGeom = geometryFactory.createLinearRing(fixedCoords)
-    newGeom
-  }
+    try {
+      val fixedLinearRing = geometryFactory.createLinearRing(fixedCoords)
 
-  def fixSelfIntersectOnExistCoordinate(geometry: Geometry): Geometry = {
-    geometry match {
-      case multiPolygon: MultiPolygon =>
-        factory.createMultiPolygon((0 until multiPolygon.getNumGeometries)
-          .map(p =>
-            fixSelfIntersectOnExistCoordinateLogic(multiPolygon.getGeometryN(p)
-              .asInstanceOf[Polygon])).toArray)
-      case polygon: Polygon => fixSelfIntersectOnExistCoordinateLogic(polygon)
-      case _ => geometry
+      fixedLinearRing
+    } catch {
+      case e: Exception => println(e.getMessage + " line 72")
+        println(linearRing)
+        println(linearRing.toString)
+        println(id)
+        linearRing
     }
   }
 
-  def fixSelfIntersectOnExistCoordinateLogic(polygon: Polygon): Polygon = {
+  def fixSelfIntersectOnExistCoordinate(linearRing: LinearRing, id: String): LinearRing = {
+    val polygon = factory.createPolygon(linearRing)
+    val fixedLinearRing = fixSelfIntersectOnExistCoordinate(polygon, id)
+      .getBoundary.getGeometryN(0).asInstanceOf[LinearRing]
+    fixedLinearRing
+  }
+
+  def fixSelfIntersectOnExistCoordinate(polygon: Polygon, id: String): Polygon = {
     val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
 
-    repaired.tail.foldLeft[Polygon](repaired.head)(
-      (acc, curr) => {
-        val accCoords = acc.getCoordinates
-        val currCoords = curr.getCoordinates
-        val currIndex = repaired.indexOf(curr)
+    repaired match {
+      case polygons: List[Polygon] if polygons.nonEmpty =>
+        polygons.tail.foldLeft[Polygon](polygons.head)(
+          (acc, curr) => {
+            val accCoords = acc.getCoordinates
+            val currCoords = curr.getCoordinates
+            val currIndex = polygons.indexOf(curr)
 
-        val problemCoord = accCoords.find(currCoords.contains)
-        val indexProblem = accCoords.indexOf(problemCoord.get)
+            val problemCoord = accCoords.find(currCoords.contains)
+            val indexProblem = accCoords.indexOf(problemCoord.get)
+
+            val currPolygonCoordinates = if (indexProblem == 0) {
+              accCoords.slice(1, accCoords.length - 1)
+            } else accCoords
+
+            val coordinatesToAddPolygon = (if (currIndex % 2 != 0) {
+              currCoords.slice(indexProblem, currCoords.length) ++
+                currCoords.slice(0, indexProblem)
+            } else {
+              (currCoords.slice(0, indexProblem) ++
+                currCoords.slice(indexProblem, currCoords.length))
+            })
+            val indexProblemCurr = coordinatesToAddPolygon.indexOf(problemCoord.get)
+
+            val firstPoint = if (indexProblem != accCoords.length - 1) {
+              accCoords(indexProblem + 1)
+            } else {
+              accCoords(accCoords.length - 2)
+            }
+
+            val secondPoint = if (indexProblemCurr == 0) {
+              coordinatesToAddPolygon(coordinatesToAddPolygon.length - 1)
+            } else {
+              coordinatesToAddPolygon(indexProblemCurr - 1)
+            }
 
 
-        val coordinatesToAddPolygon = (if (currIndex % 2 != 0) {
-          currCoords.slice(indexProblem, currCoords.length) ++
-            currCoords.slice(0, indexProblem)
+            val kakiAngle = try {
+              val angelRadi = angleBetween(firstPoint, problemCoord.get, secondPoint)
+              angelRadi
+            } catch {
+              case e: ArrayIndexOutOfBoundsException =>
+                println(e.getMessage + " line 116")
+                println(id)
+                val kaka = angleBetween(accCoords(accCoords.length - 2), problemCoord.get, coordinatesToAddPolygon(coordinatesToAddPolygon.length - 1))
 
-        } else {
-          (currCoords.slice(0, indexProblem) ++
-            currCoords.slice(indexProblem, currCoords.length))
-            .filter(c => !(c.x == problemCoord.get.x && c.y == problemCoord.get.y))
-        }).filter(c => !(c.x == problemCoord.get.x && c.y == problemCoord.get.y))
+                kaka
+              case e: Exception =>
+                println(e.getMessage + " line 116")
+                println(id)
+                val kaka = angleBetween(accCoords(accCoords.length - 2), problemCoord.get, coordinatesToAddPolygon(indexProblemCurr + 1))
 
+                kaka
+            }
+            val angle = toDegrees(kakiAngle)
 
-        val kakiAngle = try {
-          val angelRadi = angleBetweenOriented(accCoords(indexProblem - 1), problemCoord.get, currCoords.head)
-          angelRadi
-        } catch {
-          case e: Exception =>
-            println(e.getMessage)
-            val kaka = angleBetweenOriented(accCoords(accCoords.length - 2), problemCoord.get, currCoords.head)
+            println(s"angle: ${angle} angle_radian ${kakiAngle}")
+            val newCoordsMaybe = createNewCoords(currPolygonCoordinates, coordinatesToAddPolygon,
+              problemCoord.get, indexProblem, indexProblemCurr, angle)
 
-            kaka
-        }
-        val angle = toDegrees(kakiAngle)
-
-        val newCoordsMaybe = createNewCoords(accCoords, coordinatesToAddPolygon, problemCoord.get, indexProblem, angle)
-
-        try {
-          val maybePolyFix = factory.createPolygon(newCoordsMaybe)
-          maybePolyFix
-        } catch {
-          case e: Exception =>
-            println(e.getMessage)
-            polygon
-        }
-      }
-    )
+            try {
+              val maybePolyFix = factory.createPolygon(newCoordsMaybe)
+              maybePolyFix
+            } catch {
+              case e: Exception =>
+                println(e.getMessage+ " line 131")
+                println(polygon)
+                println(id)
+                polygon
+            }
+          }
+        )
+      case _ => polygon
+    }
   }
 
 
   def createNewCoords(prevCoords: Array[Coordinate], currCoordsToAdd: Array[Coordinate],
-                      problemCoord2: Coordinate, indexOfProblem: Int, angleOf: Double): Array[Coordinate] = {
+                      problemCoord2: Coordinate, indexOfProblem: Int, indexProblemCurr: Int, angleOf: Double): Array[Coordinate] = {
 
-    if (angleOf < 180) {
-      val newCoords2 = if (indexOfProblem != 0) {
-        (prevCoords.slice(0, indexOfProblem) :+
-          new Coordinate(problemCoord2.x - 0.001, problemCoord2.y - 0.001)) ++
-          (currCoordsToAdd :+ new Coordinate(problemCoord2.x + 0.001, problemCoord2.y + 0.001)) ++
-          prevCoords.slice(indexOfProblem + 1, prevCoords.length)
-      } else {
-        (currCoordsToAdd :+  new Coordinate(problemCoord2.x + 0.001, problemCoord2.y + 0.001)) ++
-          prevCoords.slice(1, prevCoords.length - 1) ++
-          Array[Coordinate]( new Coordinate(problemCoord2.x - 0.001, problemCoord2.y - 0.001),
-            currCoordsToAdd.head)
-      }
+    val leftOrRight = if ((angleOf < 90 || angleOf == 180) && angleOf > 45) (1, -1) else (-1, 1)
+    val coordsToFix: (Coordinate, Coordinate) =
+      (new Coordinate(problemCoord2.x + 0.001 * leftOrRight._1, problemCoord2.y + 0.001 * leftOrRight._1),
+      new Coordinate(problemCoord2.x + 0.001 * leftOrRight._2, problemCoord2.y + 0.001 * leftOrRight._2))
 
-      newCoords2
+    val newCoords3 = if (indexOfProblem == 0) {
+      (prevCoords :+ coordsToFix._1) ++
+        currCoordsToAdd.slice(indexProblemCurr + 1,
+          if (indexProblemCurr == 0) currCoordsToAdd.length -1 else currCoordsToAdd.length) ++
+        currCoordsToAdd.slice(if (indexProblemCurr == 0) 0 else 1, indexProblemCurr) :+
+        coordsToFix._2 :+ prevCoords.head
     } else {
-      val newCoords2 = (prevCoords.slice(0, indexOfProblem) :+
-        new Coordinate(problemCoord2.x + 0.001, problemCoord2.y + 0.001)) ++
-        (currCoordsToAdd :+ new Coordinate(problemCoord2.x - 0.001, problemCoord2.y - 0.001)) ++
+      ((prevCoords.slice(0, indexOfProblem) :+ coordsToFix._1) ++
+        currCoordsToAdd.slice(indexProblemCurr + 1, currCoordsToAdd.length).distinct ++
+        currCoordsToAdd.slice(0, indexProblemCurr).distinct :+ coordsToFix._2) ++
         prevCoords.slice(indexOfProblem + 1, prevCoords.length)
-
-      newCoords2
     }
+
+    newCoords3
   }
 }
