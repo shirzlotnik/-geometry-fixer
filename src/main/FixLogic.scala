@@ -107,6 +107,11 @@ object FixLogic {
       (cs1.slice(indexOfProblem, cs1.length), cs1.slice(0, indexOfProblem))
     })
 
+    polygonsSplitCoords.foldLeft[(Array[Coordinate], Option[Coordinate])]((Array[Coordinate](), None))({
+      case ((prev, last), (first, second)) => (prev, last)
+
+    })
+
     val newCoordinates = polygonsSplitCoords.zipWithIndex.foldLeft[Array[Coordinate]](Array[Coordinate]())(
       (prevCoords, currCoordsTupleWithIndex) => {
         val index = currCoordsTupleWithIndex._2
