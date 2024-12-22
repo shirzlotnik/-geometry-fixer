@@ -113,26 +113,43 @@ object FixLogic {
         val (firstCoords, secondCoords) = currCoordsTupleWithIndex._1
         val problemCoords = firstCoords.head
 
-        val angleFromX = if (prevCoords.isEmpty) {
-          val (firstPoint, secondPoint) = getFirstAndSecondPoints(firstCoords, secondCoords, prevCoords, problemCoords)
-          val p1 = angle(firstPoint, problemCoords)
-          val p2 = angle(problemCoords, secondPoint)
-          val p3 = p1 + p2
-          p3
-        } else {
-          val (firstPoint, secondPoint) = getFirstAndSecondPoints(firstCoords, secondCoords, prevCoords, problemCoords)
-          val p1 = angle(firstPoint, prevCoords.head)
-          val p2 = angle(prevCoords.head, secondPoint)
-          val p3 = p1 + p2
-          p3
-        }
-        val (changedCoords, changedCoordsOps) = buildNewCoordinates(angleFromX,
-          if (prevCoords.isEmpty) problemCoords else prevCoords(prevCoords.length - (index)))
-        val firstArray = if (prevCoords.isEmpty) Array[Coordinate](changedCoords) else prevCoords.slice(0, prevCoords.length - 1) :+ changedCoords
-        val lastArray = if (prevCoords.isEmpty) Array(changedCoords) else Array(changedCoordsOps, prevCoords.head)
-        val secondArray =  if (secondCoords.isEmpty) firstCoords.tail else firstCoords.slice(1, firstCoords.length - 1) ++ secondCoords
+//        val angleFromX = if (prevCoords.isEmpty) {
+//          val (firstPoint, secondPoint) = getFirstAndSecondPoints(firstCoords, secondCoords, prevCoords, problemCoords)
+//          val p1 = angle(firstPoint, problemCoords)
+//          val p2 = angle(problemCoords, secondPoint)
+//          val p3 = p1 + p2
+//          p3
+//        } else {
+//          val (firstPoint, secondPoint) = getFirstAndSecondPoints(firstCoords, secondCoords, prevCoords, problemCoords)
+//          val p1 = angle(firstPoint, prevCoords.head)
+//          val p2 = angle(prevCoords.head, secondPoint)
+//          val p3 = p1 + p2
+//          p3
+//        }
 
-         val pppp = firstArray ++ secondArray ++ lastArray
+        val (firstPoint, secondPoint) = if (prevCoords.isEmpty) {
+          getFirstAndSecondPoints(firstCoords, secondCoords, prevCoords, problemCoords)
+        } else {
+          getFirstAndSecondPoints(firstCoords, secondCoords, prevCoords, problemCoords)
+        }
+
+        val refCoords = if (prevCoords.isEmpty) problemCoords else prevCoords.last
+        val (delta1, delta2) = buildNewCoordinates3(firstPoint, secondPoint, refCoords)
+//        val coordChangeSecond = secondCoordsChanges(coordChangeFirst, secondPoint)
+
+//        val (changedCoords, changedCoordsOps) = buildNewCoordinates(angleFromX,
+//          if (prevCoords.isEmpty) problemCoords else prevCoords(prevCoords.length - (index)))
+        val firstArray = if (prevCoords.isEmpty) Array[Coordinate](delta1) else prevCoords.slice(0, prevCoords.length - 1) :+ delta1
+        val lastCoordinates = if (prevCoords.isEmpty) delta1 else prevCoords.head
+        val part1Array =  if (secondCoords.isEmpty &&
+          firstCoords.last != problemCoords) firstCoords.tail
+        else firstCoords.slice(1, firstCoords.length - 1)
+        val part2Array = (if (index > 1) Array(delta2, lastCoordinates) else Array(lastCoordinates))
+
+         val pppp = firstArray ++
+//           (if (index > 1) secondArray :+ coordChangeSecond else secondArray) ++
+           (part1Array ++ secondCoords) ++
+           part2Array
 
         pppp
       }
@@ -241,36 +258,28 @@ object FixLogic {
   }
 
 
-  def buildNewCoordinates3(angleFromX: Double, coordinate: Coordinate, opposite: Int = 1):
-  (Coordinate, Coordinate) = {
-    val sinAngle = Math.sin(angleFromX)
-    val cosAngle = Math.cos(angleFromX)
+  def secondCoordsChanges(point1: Coordinate, point2: Coordinate): Coordinate = {
     val epsilon = 0.001
 
+    val newX = point1.x + (if (point2.x > point1.x) epsilon else -epsilon)
+    val newY = point1.y + (if (point2.y > point1.y) epsilon else -epsilon)
 
-    try {
-      if (sinAngle >= 0) { // I or II
-        if (cosAngle >= 0) { // I
-          (new Coordinate(coordinate.x + epsilon, coordinate.y + epsilon),
-            new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon))
-        } else { // II
-          (new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon),
-            new Coordinate(coordinate.x - epsilon, coordinate.y + epsilon))
-        }
-      } else { // III or IV
-        if (cosAngle >= 0) { // IV
-          (new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon),
-            new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon))
-        } else { // III
-          (new Coordinate(coordinate.x + epsilon, coordinate.y - epsilon),
-            new Coordinate(coordinate.x - epsilon, coordinate.y - epsilon))
-        }
-      }
-    } catch {
-      case e: Exception => println(e.getMessage)
-        println(e.getClass)
-        (coordinate, coordinate)
-    }
+    new Coordinate(newX, newY)
+  }
+
+  def buildNewCoordinates3(point1: Coordinate, point2: Coordinate,
+                           coordinate: Coordinate): (Coordinate, Coordinate) = {
+    val epsilon = 0.001
+
+    val x1 = coordinate.x + (if (point2.x > point1.x) epsilon else -epsilon)
+    val y1 = coordinate.y + (if (point2.y > point1.y) epsilon else -epsilon)
+    val delta1 = new Coordinate(x1, y1)
+
+    val x2 = delta1.x + (if (point2.x > delta1.x) epsilon else -epsilon)
+    val y2 = delta1.y + (if (point2.y > delta1.y) epsilon else -epsilon)
+    val delta2 = new Coordinate(x2, y2)
+
+    (delta1, delta2)
   }
 
   def fixSelfIntersectOnExistCoordinate(polygon: Polygon, id: String): Polygon = {
