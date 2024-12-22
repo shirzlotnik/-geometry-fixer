@@ -93,6 +93,126 @@ object FixLogic {
     fixedLinearRing
   }
 
+  def fixSuperIntersect(polygon: Polygon, id: String): Geometry = {
+    val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
+    val coordinatesArray = repaired.map(_.getCoordinates)
+
+    val fixedPolygon = (1 until repaired.length)
+      .foldLeft[(Polygon, Option[Coordinate], Option[Coordinate])](repaired.head, None, None)({
+      case ((prevPolygon, refPoint, lastIntersect), i) => {
+        val currPolygon = repaired(i)
+        val (coordinates1, coordinates2) = (prevPolygon.getCoordinates, currPolygon.getCoordinates)
+        val intersectionPoint = lastIntersect.getOrElse(coordinates1.find(coordinates2.contains).get)
+        val (newPolygon, newRef) = merge2Polygons(coordinates1, coordinates2, refPoint, intersectionPoint)
+        (newPolygon, newRef, Some(intersectionPoint))
+      }
+      case ((a, b, c), _) => (a, b, c)
+    })._1
+
+
+    fixedPolygon
+  }
+
+  def merge2Polygons(coordinates1: Array[Coordinate], coordinates2: Array[Coordinate],
+                     refPoint: Option[Coordinate], intersectionPoint: Coordinate):
+  (Polygon, Option[Coordinate]) = {
+
+    val currRefPoint = refPoint.getOrElse(intersectionPoint)
+    val index1 = coordinates1.indexOf(coordinates1.find(c => c == intersectionPoint).get)
+    val index2 = coordinates2.indexOf(coordinates2.find(c => c == intersectionPoint).get)
+
+    val firstIndex = if (index1 > -1) index1
+    else coordinates1.indexOf(coordinates1.find(c => c == refPoint.get).get)
+
+    val (coordinates1P1, coordinates2P1, firstCheckP1, secondCheckP1) =
+      getSplitCoordinatesAndPointToCheckIntersection(coordinates1, firstIndex, true)
+    val (coordinates1P2, coordinates2P2, firstCheckP2, secondCheckP2) =
+      getSplitCoordinatesAndPointToCheckIntersection(coordinates2, index2, false)
+
+    val addedCoordinate1 = findNewIntersection(firstCheckP1, firstCheckP2, currRefPoint)
+    val addedCoordinate2 = findNewIntersection(secondCheckP2, secondCheckP1, currRefPoint)
+
+    val mergedCoordinates = (coordinates1P1 :+ addedCoordinate1) ++ coordinates2P2 ++
+      (coordinates1P2 :+ new Coordinate(addedCoordinate1.x * -1, addedCoordinate1.y * -1)) ++
+      coordinates2P1
+
+//    val mergedCoordinates = (pl1TillIntersect :+ ap1) ++ pl2FromIntersect ++
+//      (pl2TillIntersect :+ ap2) ++ pl1FromIntersect
+
+    try {
+      val newPoly = factory.createPolygon(mergedCoordinates)
+      (newPoly, Some(addedCoordinate2))
+    } catch {
+      case e: Exception => println(e.getMessage)
+        (factory.createPolygon(coordinates1), refPoint)
+    }
+  }
+
+  def getSplitCoordinatesAndPointToCheckIntersection(coordinates: Array[Coordinate],
+                                                     index: Int, first: Boolean):
+  (Array[Coordinate], Array[Coordinate], Coordinate, Coordinate) = {
+    if (first) {
+      if (index == 0) {
+        val coordinates1 = coordinates.slice(0, coordinates.length - 1)
+        val coordinates2 = Array(coordinates.head)
+        val firstCheck = coordinates1.last
+        val secondCheck = coordinates1(1)
+        (coordinates1, coordinates2, firstCheck, secondCheck)
+      } else {
+        val coordinates1 = coordinates.slice(0, index)
+        val coordinates2 = coordinates.slice(index + 1, coordinates.length)
+        val firstCheck = coordinates1.last
+        val secondCheck = coordinates2.head
+        (coordinates1, coordinates2, firstCheck, secondCheck)
+      }
+    } else {
+      if (index == 0) {
+        val coordinates1 = coordinates.slice(1, coordinates.length - 1)
+        val coordinates2 = Array[Coordinate]()
+        val firstCheck = coordinates1.head
+        val secondCheck = coordinates1.last
+        (coordinates1, coordinates2, firstCheck, secondCheck)
+      } else {
+        val coordinates1 = coordinates.slice(0, index)
+        val coordinates2 = coordinates.slice(index + 1, coordinates.length - 1)
+        val firstCheck = (if (coordinates2.isEmpty) coordinates1 else coordinates2).head
+        val secondCheck = coordinates1.last
+        (coordinates1, coordinates2, firstCheck, secondCheck)
+      }
+    }
+  }
+
+  def findNewIntersection(p1: Coordinate, p2: Coordinate, refCoords: Coordinate): Coordinate = {
+    val epsilon = 0.001
+
+    val addedX = if (p2.x > p1.x) (if (p1.x > 0 && p2.x > 0) epsilon
+    else if (p1.x < 0 && p2.x < 0) -epsilon
+    else -epsilon)
+    else if (p2.x < p1.x) (if (p1.x > 0 && p2.x > 0) epsilon
+    else if (p1.x < 0 && p2.x < 0) -epsilon
+    else if(p1.x > 0 || p2.x > 0) epsilon else -epsilon)
+    else (if (p2.x > 0 || p1.x > 0) epsilon else -epsilon)
+//    else epsilon
+
+
+    val addedY = if (p2.y > p1.y) (if (p1.y > 0 && p2.y > 0) epsilon
+    else if (p1.y < 0 && p2.y < 0) -epsilon
+    else epsilon)
+    else if (p2.y < p1.y) (if (p1.y > 0 && p2.y > 0) epsilon
+    else if (p1.y < 0 && p2.y < 0) -epsilon
+    else (if (p2.y > 0 || p1.y > 0) epsilon else -epsilon))
+    else (if (p2.y > 0) epsilon else  -epsilon)
+//    else -epsilon
+
+    val x1 = refCoords.x + addedX
+    val y1 = refCoords.y + addedY
+
+    val ap1 = new Coordinate(x1, y1)
+
+    ap1
+  }
+
+
   def fixSelfIntersectWithCoordinates(polygon: Polygon, id: String): Geometry = {
     val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
 
@@ -105,6 +225,10 @@ object FixLogic {
     val polygonsSplitCoords = repaired.map(_.getCoordinates).map(cs1 => {
       val indexOfProblem = cs1.indexOf(problemCoords)
       (cs1.slice(indexOfProblem, cs1.length), cs1.slice(0, indexOfProblem))
+    })
+
+    repaired.foldLeft[(Polygon, Coordinate)](repaired.head, repaired.head.getCoordinates.head)({
+      case ((p, c), c2) => (p,c)
     })
 
     polygonsSplitCoords.foldLeft[(Array[Coordinate], Option[Coordinate])]((Array[Coordinate](), None))({
