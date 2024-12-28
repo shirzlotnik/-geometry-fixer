@@ -143,9 +143,8 @@ object FixLogic {
       val innerCoordinates = polygonCoordinates.slice(1, polygonCoordinates.length - 1)
       val problemCoordinates = innerCoordinates
         .groupBy(c => polygonCoordinates.count(c1 => c1 == c))
-        .filter(c => c._1 > 1)
-        .map(_._2.head)
-        .toArray
+        .filter(c => c._1 > 1).values
+        .reduce((p, c) => (p ++ c). distinct)
 
       val (start, end, _) = coordinatesArray.foldLeft[(Array[Coordinate], Array[Coordinate], Seq[Coordinate])]((
         Array[Coordinate](), Array[Coordinate](), Seq[Coordinate]()))({
