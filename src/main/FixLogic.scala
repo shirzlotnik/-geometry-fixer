@@ -155,11 +155,11 @@ object FixLogic {
       val problemCoordinates = innerCoordinates
         .groupBy(c => polygonCoordinates.count(c1 => c1 == c))
         .filter(c => c._1 > 1).values
-        .reduce((p, c) => (p ++ c)).distinct
+        .reduce((p, c) => p ++ c).distinct
 
       val (start, end, _) = coordinatesArray.foldLeft[(Array[Coordinate], Array[Coordinate], Seq[Coordinate])]((
         Array[Coordinate](), Array[Coordinate](), Seq[Coordinate]()))({
-        case ((q1, q2, usedIntersections), curr) => {
+        case ((q1, q2, usedIntersections), curr) =>
           val startPoint = if (q1.isEmpty) curr.head else q1.last
           val startIndex = curr.indexOf(startPoint)
           val intersectionPoint = curr.find(c1 => problemCoordinates.contains(c1) &&
@@ -194,22 +194,27 @@ object FixLogic {
 
 
           (newQ1, newQ2, usedIntersectionPoints)
-        }
       })
 
       val reconstructArray = start ++ end.reverse
-      val fixedInnerArray = (1 until reconstructArray.length)
+      val (fixUntil, suffix) = if (problemCoordinates.contains(reconstructArray.last))
+        (reconstructArray.length - 1, Array(reconstructArray.last))
+      else (reconstructArray.length, Array[Coordinate]())
+      val fixedInnerArray = (1 until fixUntil)
         .foldLeft(Array[Coordinate]())({
           case (prev, index) =>
             val currCoords = reconstructArray(index)
-            if (reconstructArray(index - 1) == reconstructArray(index)) prev
-            else prev :+ (if (problemCoordinates.contains(currCoords))
-              findFixedCoordinate(reconstructArray(index - 1), reconstructArray(index))
-            else reconstructArray(index))
+            val nextCoordinate = if (problemCoordinates.contains(currCoords))
+              findFixedCoordinate(reconstructArray(index - 1), currCoords)
+            else currCoords
+//            if (reconstructArray(index - 1) == currCoords) prev
+//            else prev :+ ()
+            val kaka = prev :+ nextCoordinate
+            kaka
         })
 
 
-      val fixedCoordinates = reconstructArray.head +: fixedInnerArray
+      val fixedCoordinates = (reconstructArray.head +: fixedInnerArray) ++ suffix
       val fixedPolygon = factory.createPolygon(fixedCoordinates)
       fixedPolygon
     } catch {

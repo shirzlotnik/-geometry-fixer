@@ -129,12 +129,17 @@ object Main {
 
     val fixedPolygonsDF = geoJSons.withColumn("geometry", getParsedGeometry(col("geoJson"), col("id")))
       .withColumn("fixed", getFixGeometry(col("geometry"), col("id")))
-//      .withColumn("fixed", getFinalFix(col("geometry"), col("id")))
+      .withColumn("fixed1", getFixGeometry(col("geometry"), col("id")))
+      .withColumn("fixed2", getFixGeometry(col("geometry"), col("id")))
+      .withColumn("fixed3", getFixGeometry(col("geometry"), col("id")))
+      .withColumn("fixed4", getFixGeometry(col("geometry"), col("id")))
+
+    //      .withColumn("fixed", getFinalFix(col("geometry"), col("id")))
 //      .withColumn("fixed", getFixedIntersectionOnExistingCoordinate(col("geometry"), col("id")))
-      .withColumn("area", ST_Area(col("fixed")))
-      .withColumn("centroid", ST_Centroid(col("fixed")))
-      .withColumn("original_coordinates", getGeometryCoordinatesLength(col("geometry")))
-      .withColumn("fixed_coordinates", getGeometryCoordinatesLength(col("fixed")))
+//      .withColumn("area", ST_Area(col("fixed")))
+//      .withColumn("centroid", ST_Centroid(col("fixed")))
+//      .withColumn("original_coordinates", getGeometryCoordinatesLength(col("geometry")))
+//      .withColumn("fixed_coordinates", getGeometryCoordinatesLength(col("fixed")))
 
 
     fixedPolygonsDF.show(false)
