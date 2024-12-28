@@ -127,8 +127,86 @@ object FixLogic {
     val epsilon = 0.001
     val vector = new Coordinate(c1.x - c2.x, c1.y - c2.y)
     val magnitude = Math.sqrt(Math.pow(vector.x, 2) + Math.pow(vector.y, 2))
-    val newCoordinate = new Coordinate(c2. x +(epsilon * vector.x / magnitude),
+    val newCoordinate = if (magnitude == 0) c2
+    else new Coordinate(c2. x +(epsilon * vector.x / magnitude),
       c2.y + (epsilon * vector.y / magnitude))
     newCoordinate
+  }
+
+
+  def fixIntersectionOnExistingCoordinate(polygon: Polygon, id: String): Geometry = {
+    try {
+      val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
+      val coordinatesArray = repaired.map(_.getCoordinates)
+
+      val polygonCoordinates = polygon.getCoordinates
+      val innerCoordinates = polygonCoordinates.slice(1, polygonCoordinates.length - 1)
+      val problemCoordinates = innerCoordinates
+        .groupBy(c => polygonCoordinates.count(c1 => c1 == c))
+        .filter(c => c._1 > 1)
+        .map(_._2.head)
+        .toArray
+
+      val (start, end, _) = coordinatesArray.foldLeft[(Array[Coordinate], Array[Coordinate], Seq[Coordinate])]((
+        Array[Coordinate](), Array[Coordinate](), Seq[Coordinate]()))({
+        case ((q1, q2, usedIntersections), curr) => {
+          val startPoint = if (q1.isEmpty) curr.head else q1.last
+          val startIndex = curr.indexOf(startPoint)
+          val intersectionPoint = curr.find(c1 => problemCoordinates.contains(c1) &&
+            !usedIntersections.contains(c1))
+          val intersectionPointIndex = if (intersectionPoint.isDefined) curr.indexOf(intersectionPoint.get)
+          else startIndex
+
+          val usedIntersectionPoints = usedIntersections ++ Seq(curr(intersectionPointIndex))
+
+          val (newQ1, newQ2) = if (q1.isEmpty) {
+            val newQ1_2 = curr.slice(startIndex, intersectionPointIndex + 1)
+            val newQ2_2 = curr.slice(intersectionPointIndex + 1, curr.length)
+
+            val (fq, lq) = (q1 ++ newQ1_2, q2 ++ newQ2_2.reverse)
+            (fq, lq)
+          } else {
+            val newQ1_2 = if (intersectionPointIndex < startIndex)
+              curr.slice(startIndex + 1, curr. length) ++
+                curr.slice(1, intersectionPointIndex + 1)
+            else if (startIndex == intersectionPointIndex)
+              curr.slice(startIndex + 1, curr.length) ++ curr.slice(1, startIndex + 1)
+            else curr.slice(startIndex + 1, intersectionPointIndex + 1)
+            val newQ2_2 = if (intersectionPointIndex < startIndex)
+              curr.slice(intersectionPointIndex + 1, startIndex + 1)
+            else if (startIndex == intersectionPointIndex) Array[Coordinate]()
+            else curr.slice(intersectionPointIndex + 1, curr.length) ++
+              curr.slice(1, startIndex + 1)
+
+            val (fq, lq) = (q1 ++ newQ1_2, q2 ++ newQ2_2.reverse)
+            (fq, lq)
+          }
+
+
+          (newQ1, newQ2, usedIntersectionPoints)
+        }
+      })
+
+      val reconstructArray = start ++ end.reverse
+      val fixedInnerArray = (1 until reconstructArray.length)
+        .foldLeft(Array[Coordinate]())({
+          case (prev, index) =>
+            val currCoords = reconstructArray(index)
+            if (reconstructArray(index - 1) == reconstructArray(index)) prev
+            else prev :+ (if (problemCoordinates.contains(currCoords))
+              findFixedCoordinate(reconstructArray(index - 1), reconstructArray(index))
+            else reconstructArray(index))
+        })
+
+
+      val fixedCoordinates = reconstructArray.head +: fixedInnerArray :+ reconstructArray.head
+      val fixedPolygon = factory.createPolygon(fixedCoordinates)
+      fixedPolygon
+    } catch {
+      case e: Exception => println(e.getMessage)
+        println(e.getCause)
+        println(id)
+        polygon
+    }
   }
 }
