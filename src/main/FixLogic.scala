@@ -169,37 +169,26 @@ object FixLogic {
             curr.indexOf(intersectionPoint.get) + 1
           else startIndex
 
-          val usedIntersectionPoints = usedIntersections ++ Seq(curr(intersectionPointIndex - 1))
+          val usedIntersectionPoints = usedIntersections :+ curr(intersectionPointIndex - 1)
 
-          val (newQ1, newQ2) = if (q1.isEmpty) {
-            val newQ1_2 = if (startIndex == intersectionPointIndex)
-              curr.slice(startIndex - 1, currLength)
-            else curr.slice(startIndex - 1, intersectionPointIndex)
-            val newQ2_2 = if (startIndex == intersectionPointIndex)
-              curr.slice(0, intersectionPointIndex)
-            else curr.slice(intersectionPointIndex, currLength)
-
-            val (fq, lq) = (q1 ++ newQ1_2, q2 ++ newQ2_2.reverse)
-            (fq, lq)
+          val (ltrq, rtlq) = if (q1.isEmpty) {
+            val (ltr, rtl) = if (startIndex == intersectionPointIndex)
+              (curr.slice(startIndex - 1, currLength), curr.slice(0, intersectionPointIndex))
+            else (curr.slice(startIndex - 1, intersectionPointIndex), curr.slice(intersectionPointIndex, currLength))
+            (ltr, rtl.reverse)
           } else {
-            val newQ1_2 = if (intersectionPointIndex < startIndex)
-              curr.slice(startIndex, currLength) ++
-                curr.slice(1, intersectionPointIndex)
+            val (ltr,rtl) = if (intersectionPointIndex < startIndex)
+              (curr.slice(startIndex, currLength) ++ curr.slice(1, intersectionPointIndex),
+                curr.slice(intersectionPointIndex, startIndex))
             else if (startIndex == intersectionPointIndex)
-              curr.slice(startIndex, currLength) ++ curr.slice(1, startIndex)
-            else curr.slice(startIndex, intersectionPointIndex)
-            val newQ2_2 = if (intersectionPointIndex < startIndex)
-              curr.slice(intersectionPointIndex, startIndex)
-            else if (startIndex == intersectionPointIndex) Array[Coordinate]()
-            else curr.slice(intersectionPointIndex, currLength) ++
-              curr.slice(1, startIndex)
-
-            val (fq, lq) = (q1 ++ newQ1_2, q2 ++ newQ2_2.reverse)
-            (fq, lq)
+              (curr.slice(startIndex, currLength) ++ curr.slice(1, startIndex),
+                Array[Coordinate]())
+            else (curr.slice(startIndex, intersectionPointIndex),
+              curr.slice(intersectionPointIndex, currLength) ++ curr.slice(1, startIndex))
+            (ltr, rtl.reverse)
           }
 
-
-          (newQ1, newQ2, usedIntersectionPoints)
+          (q1 ++ ltrq, q2 ++ rtlq, usedIntersectionPoints)
       })
 
       val reconstructArray = start ++ end.reverse
@@ -210,13 +199,13 @@ object FixLogic {
         .foldLeft(Array[Coordinate]())({
           case (prev, index) =>
             val currCoords = reconstructArray(index)
-            val nextCoordinate = if (problemCoordinates.contains(currCoords))
-              findFixedCoordinate(reconstructArray(index - 1), currCoords)
-            else currCoords
-//            if (reconstructArray(index - 1) == currCoords) prev
-//            else prev :+ ()
-            val kaka = prev :+ nextCoordinate
-            kaka
+            prev :+ (if (problemCoordinates.contains(currCoords))
+            findFixedCoordinate(reconstructArray(index - 1), currCoords)
+          else currCoords)
+////            if (reconstructArray(index - 1) == currCoords) prev
+////            else prev :+ ()
+//            val kaka = prev :+ nextCoordinate
+//            kaka
         })
 
 
