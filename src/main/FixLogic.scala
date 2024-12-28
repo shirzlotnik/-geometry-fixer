@@ -26,7 +26,7 @@ object FixLogic {
     val boundary = polygon.getBoundary
     val fixedLinearRings = (0 until boundary.getNumGeometries)
       .map(boundary.getGeometryN(_).asInstanceOf[LinearRing])
-      .map(lr => finalFix(lr, id))
+      .map(lr => fixIntersectionLogic(lr, id))
       .map(lr => fixCoordinatesDuplicates(lr, id))
       //      .map(fixRegularIntersection)
       .toArray
@@ -63,6 +63,10 @@ object FixLogic {
             (currFixedCoords :+ coordinates(i+1), currSlope)
           }
       }._1
+
+    val fixedCoordinates = if (fixedCoords(fixedCoords.length - 2) == fixedCoords.last)
+      fixedCoords.reverse.tail.reverse
+    else fixedCoords
 
     try {
       val fixedLinearRing = geometryFactory.createLinearRing(fixedCoords)
@@ -134,7 +138,14 @@ object FixLogic {
   }
 
 
-  def fixIntersectionOnExistingCoordinate(polygon: Polygon, id: String): Geometry = {
+  def fixIntersectionLogic(linearRing: LinearRing, id: String): LinearRing = {
+    val polygon = factory.createPolygon(linearRing)
+    val fixedLinearRing = fixIntersectionOnExistingCoordinate(polygon, id)
+      .getBoundary.getGeometryN(0).asInstanceOf[LinearRing]
+    fixedLinearRing
+  }
+
+  def fixIntersectionOnExistingCoordinate(polygon: Polygon, id: String): Polygon = {
     try {
       val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
       val coordinatesArray = repaired.map(_.getCoordinates)
@@ -144,7 +155,7 @@ object FixLogic {
       val problemCoordinates = innerCoordinates
         .groupBy(c => polygonCoordinates.count(c1 => c1 == c))
         .filter(c => c._1 > 1).values
-        .reduce((p, c) => (p ++ c). distinct)
+        .reduce((p, c) => (p ++ c)).distinct
 
       val (start, end, _) = coordinatesArray.foldLeft[(Array[Coordinate], Array[Coordinate], Seq[Coordinate])]((
         Array[Coordinate](), Array[Coordinate](), Seq[Coordinate]()))({
@@ -166,7 +177,7 @@ object FixLogic {
             (fq, lq)
           } else {
             val newQ1_2 = if (intersectionPointIndex < startIndex)
-              curr.slice(startIndex + 1, curr. length) ++
+              curr.slice(startIndex + 1, curr.length) ++
                 curr.slice(1, intersectionPointIndex + 1)
             else if (startIndex == intersectionPointIndex)
               curr.slice(startIndex + 1, curr.length) ++ curr.slice(1, startIndex + 1)
@@ -198,7 +209,7 @@ object FixLogic {
         })
 
 
-      val fixedCoordinates = reconstructArray.head +: fixedInnerArray :+ reconstructArray.head
+      val fixedCoordinates = reconstructArray.head +: fixedInnerArray
       val fixedPolygon = factory.createPolygon(fixedCoordinates)
       fixedPolygon
     } catch {
