@@ -169,11 +169,15 @@ object FixLogic {
             curr.indexOf(intersectionPoint.get) + 1
           else startIndex
 
-          val usedIntersectionPoints = usedIntersections ++ Seq(curr(intersectionPointIndex))
+          val usedIntersectionPoints = usedIntersections ++ Seq(curr(intersectionPointIndex - 1))
 
           val (newQ1, newQ2) = if (q1.isEmpty) {
-            val newQ1_2 = curr.slice(startIndex - 1, intersectionPointIndex)
-            val newQ2_2 = curr.slice(intersectionPointIndex, currLength)
+            val newQ1_2 = if (startIndex == intersectionPointIndex)
+              curr.slice(startIndex - 1, currLength)
+            else curr.slice(startIndex - 1, intersectionPointIndex)
+            val newQ2_2 = if (startIndex == intersectionPointIndex)
+              curr.slice(0, intersectionPointIndex)
+            else curr.slice(intersectionPointIndex, currLength)
 
             val (fq, lq) = (q1 ++ newQ1_2, q2 ++ newQ2_2.reverse)
             (fq, lq)

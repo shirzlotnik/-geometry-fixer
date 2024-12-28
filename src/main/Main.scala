@@ -106,20 +106,20 @@ object Main {
 
 
     val geoJSons = Seq(
-//      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]}", "polygon1"),
-//      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]}", "polygon2"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]}", "polygon1"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]}", "polygon2"),
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]]}", "multipolygon1"),
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]]}", "multipolygon2"),
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]],[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]]}", "multipolygon_1_2"),
 //
-//      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0]]]}", "polygon1_missing_closing_ring"), // work
-//      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]}", "polygon2_missing_closing_ring"), // no work
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0]]]}", "polygon1_missing_closing_ring"), // work
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]}", "polygon2_missing_closing_ring"), // no work
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0]]]]}", "multipolygon1_missing_closing_ring"), // work
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]]}", "multipolygon2_missing_closing_ring"), // no work
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]],[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0]]]]}", "multipolygon_1_2_missing_closing_ring"), // no work
-//      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.5,-0.5],[0,0],[1.5,0.5],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "bowtie_2"),
-//      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.6,-0.4],[0,0],[1.5,0.5],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "wierd_bowtie_1"),
-//      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.5,-0.5],[0,0],[1.6,0.4],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "wierd_bowtie_2"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.5,-0.5],[0,0],[1.5,0.5],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "bowtie_2"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.6,-0.4],[0,0],[1.5,0.5],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "wierd_bowtie_1"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.5,-0.5],[0,0],[1.6,0.4],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "wierd_bowtie_2"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[1,8],[5,4],[4,1],[0,0],[-3,0],[-6,-3],[-5,-5],[-2,-4],[0,0],[-4,4],[-1,5],[0,0]]]}", "extra_polygon"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-6,0],[-4,4],[0,0],[5,3],[6,1],[10,7],[11,2],[6,1],[0,0],[-6,0]]]}", "multi_intersection_points_1"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-6,0],[-4,4],[0,0],[1,2],[5,3],[6,1],[10,7],[11,2],[6,1],[0,0],[-6,0]]]}", "multi_intersection_points_2"),
@@ -129,10 +129,10 @@ object Main {
 
     val fixedPolygonsDF = geoJSons.withColumn("geometry", getParsedGeometry(col("geoJson"), col("id")))
       .withColumn("fixed", getFixGeometry(col("geometry"), col("id")))
-      .withColumn("fixed1", getFixGeometry(col("geometry"), col("id")))
-      .withColumn("fixed2", getFixGeometry(col("geometry"), col("id")))
-      .withColumn("fixed3", getFixGeometry(col("geometry"), col("id")))
-      .withColumn("fixed4", getFixGeometry(col("geometry"), col("id")))
+//      .withColumn("fixed1", getFixGeometry(col("geometry"), col("id")))
+//      .withColumn("fixed2", getFixGeometry(col("geometry"), col("id")))
+//      .withColumn("fixed3", getFixGeometry(col("geometry"), col("id")))
+//      .withColumn("fixed4", getFixGeometry(col("geometry"), col("id")))
 
     //      .withColumn("fixed", getFinalFix(col("geometry"), col("id")))
 //      .withColumn("fixed", getFixedIntersectionOnExistingCoordinate(col("geometry"), col("id")))
