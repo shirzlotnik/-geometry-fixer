@@ -26,8 +26,8 @@ object FixLogic {
     val boundary = polygon.getBoundary
     val fixedLinearRings = (0 until boundary.getNumGeometries)
       .map(boundary.getGeometryN(_).asInstanceOf[LinearRing])
-//      .map(lr => fixIntersectionLogic(lr, id))
-      .map(fixGeometry)
+      .map(lr => fixIntersectionLogic(lr, id))
+//      .map(fixGeometry)
       .map(lr => fixCoordinatesDuplicates(lr, id))
       //      .map(fixRegularIntersection)
       .toArray

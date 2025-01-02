@@ -106,6 +106,7 @@ object Main {
 
 
     val geoJSons = Seq(
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-6,0],[-4,4],[0,0],[4,-6],[6,1],[10,7],[13,4],[11,2],[6,1],[5,3],[1,2],[0,0],[-6,0]]]}", "multi_intersection_points_4"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]}", "polygon1"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]}", "polygon2"),
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]]}", "multipolygon1"),
@@ -136,8 +137,8 @@ object Main {
 
     //      .withColumn("fixed", getFinalFix(col("geometry"), col("id")))
 //      .withColumn("fixed", getFixedIntersectionOnExistingCoordinate(col("geometry"), col("id")))
-//      .withColumn("area", ST_Area(col("fixed")))
-//      .withColumn("centroid", ST_Centroid(col("fixed")))
+      .withColumn("area", ST_Area(col("fixed")))
+      .withColumn("centroid", ST_Centroid(col("fixed")))
 //      .withColumn("original_coordinates", getGeometryCoordinatesLength(col("geometry")))
 //      .withColumn("fixed_coordinates", getGeometryCoordinatesLength(col("fixed")))
 
