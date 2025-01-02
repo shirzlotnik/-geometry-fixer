@@ -50,7 +50,7 @@ object FixLogic {
     val coordinates = linearRing.getCoordinates
 
     val problemCoordinates = coordinates
-      .groupBy(c => coordinates.count(c1 => c1 == c))
+      .groupBy(c => coordinates.tail.count(c1 => c1 == c))
       .filter(c => c._1 > 1).values
       .reduce((p, c) => p ++ c).distinct
 
@@ -77,14 +77,58 @@ object FixLogic {
     }
   }
 
+  private def makeClockWise(coordinates: Array[Coordinate], problem: Coordinate): Array[Coordinate] = {
+    val index = coordinates.indexOf(problem)
+    if (coordinates.length > 2) {
+      val (p1, p2, p3) = (coordinates(0), coordinates(1), coordinates(2))
+      val orientation = (p2.y - p1.y) * (p3.x - p2.x) -
+        (p2.x - p1.x) * (p3.y - p2.y)
+      if (orientation < 0) (coordinates.slice(0, index).reverse :+ coordinates(index)) ++
+        coordinates.slice(index + 1, coordinates.length + 1)
+      else coordinates
+    } else coordinates
+  }
+
+  private def findAngle(c1: Coordinate, c2: Coordinate, c3: Coordinate): Double = {
+    val v1 = (c2.x - c1.x, c2.y - c1.y)
+    val v2 = (c3.x - c2.x, c3.y - c2.y)
+    val v1V2 = (v1._1 * v2._1) + (v1._2 * v2._2)
+    val v1Len = Math.sqrt(Math.pow(v1._1, 2) + Math.pow(v1._2, 2))
+    val v2Len = Math.sqrt(Math.pow(v2._1, 2) + Math.pow(v2._2, 2))
+    val angle = Math.acos(v1V2 / (v1Len * v2Len))
+    angle
+  }
+
   def reconstructCoordinates(coordinates: Array[Coordinate], problem: Coordinate): Array[Coordinate] = {
-    val problemIndexes = coordinates.zipWithIndex.filter(cwi => problem == cwi._1).map(_._2)
+    val problemIndexes = coordinates.zipWithIndex
+      .filter(cwi => problem == cwi._1).map(_._2).sorted
+
     val (first, last) = (problemIndexes.min, problemIndexes.max)
 
-    val reconstructedCoordinates = coordinates.slice(0, first) ++
-      coordinates.slice(first, last + 1).reverse ++
-      coordinates.slice(last + 1, coordinates.length + 1)
-    reconstructedCoordinates
+    val rec = problemIndexes.foldLeft((Array[Array[Coordinate]](), 0))({
+      case ((prev, start), currIndexProblem) =>
+        val next1 = makeClockWise(coordinates.slice(start, currIndexProblem + 1), problem)
+        (prev :+ next1, currIndexProblem + 1)
+    })._1
+
+    val kaka = rec.tail.foldLeft((rec.head, Array(rec.head)))({
+      case ((prevCoordinates, usedSubs), currSub) =>
+        val remain = rec.filter(r => !usedSubs.contains(r))
+        val anglesAndParts = remain.map(a1 =>
+          (findAngle(currSub(currSub.length - 2), currSub.last, a1.head), a1))
+        val minAngle = anglesAndParts.map(_._1).min
+        val nextPart = anglesAndParts.find(_._1 == minAngle).get._2
+
+        val next = prevCoordinates ++ nextPart
+        (next, usedSubs :+ nextPart)
+    })._1 ++ coordinates.slice(last + 1, coordinates.length)
+
+//    val reconstructedCoordinates = coordinates.slice(0, first) ++
+//      coordinates.slice(first, last + 1).reverse ++
+//      coordinates.slice(last + 1, coordinates.length + 1)
+//    reconstructedCoordinates
+
+    kaka
   }
 
 
