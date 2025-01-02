@@ -26,7 +26,8 @@ object FixLogic {
     val boundary = polygon.getBoundary
     val fixedLinearRings = (0 until boundary.getNumGeometries)
       .map(boundary.getGeometryN(_).asInstanceOf[LinearRing])
-      .map(lr => fixIntersectionLogic(lr, id))
+//      .map(lr => fixIntersectionLogic(lr, id))
+      .map(fixGeometry)
       .map(lr => fixCoordinatesDuplicates(lr, id))
       //      .map(fixRegularIntersection)
       .toArray
@@ -43,6 +44,50 @@ object FixLogic {
         polygon
     }
   }
+
+
+  def fixGeometry(linearRing: LinearRing): LinearRing = {
+    val coordinates = linearRing.getCoordinates
+
+    val problemCoordinates = coordinates
+      .groupBy(c => coordinates.count(c1 => c1 == c))
+      .filter(c => c._1 > 1).values
+      .reduce((p, c) => p ++ c).distinct
+
+    val pipi = problemCoordinates.foldLeft(coordinates)({
+      case (prev, currProblem) => reconstructCoordinates(prev, currProblem)
+    })
+
+    val fixedInnerArray = (1 until pipi.length)
+      .foldLeft(Array[Coordinate]())({
+        case (prev, index) =>
+          val currCoords = pipi(index)
+          prev :+ (if (problemCoordinates.contains(currCoords) && index < pipi.length - 1)
+            findFixedCoordinate(pipi(index - 1), currCoords)
+          else currCoords)
+      })
+
+    try {
+      val fixedLinearRing = factory.createLinearRing(pipi.head +: fixedInnerArray)
+      fixedLinearRing
+    } catch {
+      case e: Exception =>
+        println(e.getMessage)
+        linearRing
+    }
+  }
+
+  def reconstructCoordinates(coordinates: Array[Coordinate], problem: Coordinate): Array[Coordinate] = {
+    val problemIndexes = coordinates.zipWithIndex.filter(cwi => problem == cwi._1).map(_._2)
+    val (first, last) = (problemIndexes.min, problemIndexes.max)
+
+    val reconstructedCoordinates = coordinates.slice(0, first) ++
+      coordinates.slice(first, last + 1).reverse ++
+      coordinates.slice(last + 1, coordinates.length + 1)
+    reconstructedCoordinates
+  }
+
+
 
 
   def fixCoordinatesDuplicates(linearRing: LinearRing, id: String): LinearRing = {
