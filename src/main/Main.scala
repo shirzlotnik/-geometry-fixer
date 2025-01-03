@@ -92,8 +92,8 @@ object Main {
   case class GeomFromWKT(wkt: String)
 
   def main(args: Array[String]): Unit = {
-    val sedonaContex = SedonaContext.builder().master("local[*]").getOrCreate()
-    val spark = SedonaContext.create(sedonaContex)
+    val seasonedContext = SedonaContext.builder().master("local[*]").getOrCreate()
+    val spark = SedonaContext.create(seasonedContext)
 
     import spark.implicits._
 
@@ -106,7 +106,10 @@ object Main {
 
 
     val geoJSons = Seq(
-      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-6,0],[-4,4],[0,0],[4,-6],[6,1],[10,7],[13,4],[11,2],[6,1],[5,3],[1,2],[0,0],[-6,0]]]}", "multi_intersection_points_4"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-6,0],[-4,4],[0,0],[4,-6],[6,1],[10,7],[13,4],[11,2],[6,1],[5,3],[1,2],[0,0],[-6,0]]]}", "multi_intersection_points_x1"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[-6,0],[-4,4],[0,0],[1,2],[5,3],[6,1],[10,7],[13,4],[11,2],[6,1],[4,-6],[0,0]]]}", "multi_intersection_points_x2"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[-6,0],[-4,4],[0,0],[4,-6],[6,1],[10,7],[13,4],[11,2],[6,1],[5,3],[1,2],[0,0]]]}", "multi_intersection_points_x3"),
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[4,-6],[6,1],[10,7],[13,4],[11,2],[6,1],[5,3],[1,2],[0,0],[-6,0],[-4,4],[0,0]]]}", "multi_intersection_points_x4"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]}", "polygon1"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]}", "polygon2"),
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]]}", "multipolygon1"),
@@ -139,12 +142,18 @@ object Main {
 //      .withColumn("fixed", getFixedIntersectionOnExistingCoordinate(col("geometry"), col("id")))
       .withColumn("area", ST_Area(col("fixed")))
       .withColumn("centroid", ST_Centroid(col("fixed")))
+//      .withColumn("centroid1", ST_Centroid(col("fixed2")))
+//      .withColumn("centroid2", ST_Centroid(col("fixed3")))
+//      .withColumn("centroid3", ST_Centroid(col("fixed4")))
 //      .withColumn("original_coordinates", getGeometryCoordinatesLength(col("geometry")))
 //      .withColumn("fixed_coordinates", getGeometryCoordinatesLength(col("fixed")))
 
 
     fixedPolygonsDF.show(false)
 
+
+//    fixedPolygonsDF.select(col("id"), col("geometry"), col("fixed"), col("centroid"), col("fixed2"), col("centroid1"),
+//      col("fixed3"), col("centroid2"), col("fixed4"), col("centroid3")).show(false)
 
 //    val wktDf = Seq(GeomFromWKT("POLYGON ((2.49939 0.332335, 2.905884 0.315855, 2.90863 -0.019226, 1.991272 -0.00824, 2.026978 -0.42297, 2.504883 -0.398251, 2.502136 -0.013733, 2.49939 0.332335))"))
 //      .toDF().withColumn("geom", ST_GeomFromText(col("wkt"))).withColumn("geoJson", ST_AsGeoJSON(col("geom")))

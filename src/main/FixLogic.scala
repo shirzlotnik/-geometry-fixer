@@ -1,11 +1,10 @@
 import org.geotools.geometry.jts.JTS.makeValid
-import org.locationtech.jts.algorithm.Angle.{angle, angleBetween, angleBetweenOriented, bisector, interiorAngle, toDegrees}
 import org.locationtech.jts.geom._
 
 object FixLogic {
   implicit val factory: GeometryFactory = new GeometryFactory()
 
-  def getSlope(head: Coordinate, tail: Coordinate): Double = {
+  private def getSlope(head: Coordinate, tail: Coordinate): Double = {
     if (head.x == tail.x) {
       (head.y - tail.y)/(-1 * Double.MinPositiveValue)
     } else {
@@ -45,120 +44,32 @@ object FixLogic {
     }
   }
 
-
-  def fixGeometry(linearRing: LinearRing): LinearRing = {
-    val coordinates = linearRing.getCoordinates
-
-    val problemCoordinates = coordinates
-      .groupBy(c => coordinates.tail.count(c1 => c1 == c))
-      .filter(c => c._1 > 1).values
-      .reduce((p, c) => p ++ c).distinct
-
-    val pipi = problemCoordinates.foldLeft(coordinates)({
-      case (prev, currProblem) => reconstructCoordinates(prev, currProblem)
-    })
-
-    val fixedInnerArray = (1 until pipi.length)
-      .foldLeft(Array[Coordinate]())({
-        case (prev, index) =>
-          val currCoords = pipi(index)
-          prev :+ (if (problemCoordinates.contains(currCoords) && index < pipi.length - 1)
-            findFixedCoordinate(pipi(index - 1), currCoords)
-          else currCoords)
-      })
-
-    try {
-      val fixedLinearRing = factory.createLinearRing(pipi.head +: fixedInnerArray)
-      fixedLinearRing
-    } catch {
-      case e: Exception =>
-        println(e.getMessage)
-        linearRing
-    }
-  }
-
-  private def makeClockWise(coordinates: Array[Coordinate], problem: Coordinate): Array[Coordinate] = {
-    val index = coordinates.indexOf(problem)
-    if (coordinates.length > 2) {
-      val (p1, p2, p3) = (coordinates(0), coordinates(1), coordinates(2))
-      val orientation = (p2.y - p1.y) * (p3.x - p2.x) -
-        (p2.x - p1.x) * (p3.y - p2.y)
-      if (orientation < 0) (coordinates.slice(0, index).reverse :+ coordinates(index)) ++
-        coordinates.slice(index + 1, coordinates.length + 1)
-      else coordinates
-    } else coordinates
-  }
-
-  private def findAngle(c1: Coordinate, c2: Coordinate, c3: Coordinate): Double = {
-    val v1 = (c2.x - c1.x, c2.y - c1.y)
-    val v2 = (c3.x - c2.x, c3.y - c2.y)
-    val v1V2 = (v1._1 * v2._1) + (v1._2 * v2._2)
-    val v1Len = Math.sqrt(Math.pow(v1._1, 2) + Math.pow(v1._2, 2))
-    val v2Len = Math.sqrt(Math.pow(v2._1, 2) + Math.pow(v2._2, 2))
-    val angle = Math.acos(v1V2 / (v1Len * v2Len))
-    angle
-  }
-
-  def reconstructCoordinates(coordinates: Array[Coordinate], problem: Coordinate): Array[Coordinate] = {
-    val problemIndexes = coordinates.zipWithIndex
-      .filter(cwi => problem == cwi._1).map(_._2).sorted
-
-    val (first, last) = (problemIndexes.min, problemIndexes.max)
-
-    val rec = problemIndexes.foldLeft((Array[Array[Coordinate]](), 0))({
-      case ((prev, start), currIndexProblem) =>
-        val next1 = makeClockWise(coordinates.slice(start, currIndexProblem + 1), problem)
-        (prev :+ next1, currIndexProblem + 1)
-    })._1
-
-    val kaka = rec.tail.foldLeft((rec.head, Array(rec.head)))({
-      case ((prevCoordinates, usedSubs), currSub) =>
-        val remain = rec.filter(r => !usedSubs.contains(r))
-        val anglesAndParts = remain.map(a1 =>
-          (findAngle(currSub(currSub.length - 2), currSub.last, a1.head), a1))
-        val minAngle = anglesAndParts.map(_._1).min
-        val nextPart = anglesAndParts.find(_._1 == minAngle).get._2
-
-        val next = prevCoordinates ++ nextPart
-        (next, usedSubs :+ nextPart)
-    })._1 ++ coordinates.slice(last + 1, coordinates.length)
-
-//    val reconstructedCoordinates = coordinates.slice(0, first) ++
-//      coordinates.slice(first, last + 1).reverse ++
-//      coordinates.slice(last + 1, coordinates.length + 1)
-//    reconstructedCoordinates
-
-    kaka
-  }
-
-
-
-
   def fixCoordinatesDuplicates(linearRing: LinearRing, id: String): LinearRing = {
     val coordinates = linearRing.getCoordinates
     val geometryFactory = new GeometryFactory()
 
-    val fixedCoords = (0 until coordinates.length - 1)
+    val cleanCoordinates = (0 until coordinates.length - 1)
       .foldLeft[(Array[Coordinate], Double)](Array[Coordinate](), Double.NaN) {
-        case ((accCoords, lastSlope), i) =>
+        case ((prev, lastSlope), i) =>
           val pureSlope = getSlope(coordinates(i), coordinates(i+1))
           val currSlope = if (pureSlope == Double.PositiveInfinity || pureSlope == Double.NegativeInfinity)
             pureSlope
           else
             BigDecimal(pureSlope).setScale(5, BigDecimal.RoundingMode.HALF_UP).toDouble
-          if (i == 0) (accCoords ++ Array(coordinates(i), coordinates(i+1)), currSlope)
+          if (i == 0) (prev ++ Array(coordinates(i), coordinates(i+1)), currSlope)
           else {
-            val currFixedCoords = if (lastSlope == currSlope) accCoords.slice(0, accCoords.length - 1) else accCoords
-            (currFixedCoords :+ coordinates(i+1), currSlope)
+            val cleanedCoordinates = if (lastSlope == currSlope) prev.slice(0, prev.length - 1)
+            else prev
+            (cleanedCoordinates :+ coordinates(i+1), currSlope)
           }
       }._1
 
-    val fixedCoordinates = if (fixedCoords(fixedCoords.length - 2) == fixedCoords.last)
-      fixedCoords.reverse.tail.reverse
-    else fixedCoords
+    val fixedCoordinates = if (cleanCoordinates(cleanCoordinates.length - 2) == cleanCoordinates.last)
+      cleanCoordinates.reverse.tail.reverse
+    else cleanCoordinates
 
     try {
-      val fixedLinearRing = geometryFactory.createLinearRing(fixedCoords)
+      val fixedLinearRing = geometryFactory.createLinearRing(fixedCoordinates)
 
       fixedLinearRing
     } catch {
@@ -171,52 +82,8 @@ object FixLogic {
   }
 
 
-  def finalFix(linearRing: LinearRing, id: String): LinearRing = {
-    val polygon = factory.createPolygon(linearRing)
-    val fixedLinearRing = finalFix(polygon, id)
-      .getBoundary.getGeometryN(0).asInstanceOf[LinearRing]
-    fixedLinearRing
-  }
 
-
-  def finalFix(polygon: Polygon, id: String): Geometry = {
-    val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
-    val coordinatesArray = repaired.map(_.getCoordinates)
-
-    val polygonCoordinates = polygon.getCoordinates
-    val innerCoordinates = polygonCoordinates.slice(1, polygonCoordinates.length - 1)
-    val problemCoordinates = innerCoordinates
-      .groupBy(c => polygonCoordinates.count(c1 => c1 == c))
-      .filter(c => c._1 > 1)
-      .map(_._2.head)
-      .toArray
-
-    val innerCW = coordinatesArray.foldLeft(Array[Coordinate]())({
-      case (prev, curr) =>
-        problemCoordinates.foldLeft(prev)({
-          case (prev1, curr1) =>
-            val indexCurrProblem = curr.indexOf(curr1)
-            prev1 ++ (if (indexCurrProblem != -1)
-              curr.slice(indexCurrProblem, curr.length - 1) ++ curr.slice(0, indexCurrProblem)
-            else Array[Coordinate]())
-        })
-    })
-
-    val fixedInnerCoordinates = (1 until innerCW.length)
-      .foldLeft(Array[Coordinate]())({
-      case (prev, index) =>
-        val currCoords = innerCW(index)
-        prev :+ (if (problemCoordinates.contains(currCoords)) {
-          findFixedCoordinate(innerCW(index - 1), innerCW(index))
-        } else innerCW(index))
-    })
-
-    val fixedPolygonCoordinates = innerCW.head +: fixedInnerCoordinates :+ innerCW.head
-    val fixedPolygon = factory.createPolygon(fixedPolygonCoordinates)
-    fixedPolygon
-  }
-
-  def findFixedCoordinate(c1: Coordinate, c2: Coordinate): Coordinate = {
+  private def findFixedCoordinate(c1: Coordinate, c2: Coordinate): Coordinate = {
     val epsilon = 0.001
     val vector = new Coordinate(c1.x - c2.x, c1.y - c2.y)
     val magnitude = Math.sqrt(Math.pow(vector.x, 2) + Math.pow(vector.y, 2))
@@ -227,14 +94,14 @@ object FixLogic {
   }
 
 
-  def fixIntersectionLogic(linearRing: LinearRing, id: String): LinearRing = {
+  private def fixIntersectionLogic(linearRing: LinearRing, id: String): LinearRing = {
     val polygon = factory.createPolygon(linearRing)
     val fixedLinearRing = fixIntersectionOnExistingCoordinate(polygon, id)
       .getBoundary.getGeometryN(0).asInstanceOf[LinearRing]
     fixedLinearRing
   }
 
-  def fixIntersectionOnExistingCoordinate(polygon: Polygon, id: String): Polygon = {
+  private def fixIntersectionOnExistingCoordinate(polygon: Polygon, id: String): Polygon = {
     try {
       val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
       val coordinatesArray = repaired.map(_.getCoordinates)
@@ -260,7 +127,7 @@ object FixLogic {
 
           val usedIntersectionPoints = usedIntersections :+ curr(intersectionPointIndex - 1)
 
-          val (ltrq, rtlq) = if (q1.isEmpty) {
+          val (cw, ccw) = if (q1.isEmpty) {
             val (ltr, rtl) = if (startIndex == intersectionPointIndex)
               (curr.slice(startIndex - 1, currLength), curr.slice(0, intersectionPointIndex))
             else (curr.slice(startIndex - 1, intersectionPointIndex), curr.slice(intersectionPointIndex, currLength))
@@ -277,28 +144,30 @@ object FixLogic {
             (ltr, rtl.reverse)
           }
 
-          (q1 ++ ltrq, q2 ++ rtlq, usedIntersectionPoints)
+          (q1 ++ cw, q2 ++ ccw, usedIntersectionPoints)
       })
 
       val reconstructArray = start ++ end.reverse
-      val (fixUntil, suffix) = if (problemCoordinates.contains(reconstructArray.last))
-        (reconstructArray.length - 1, Array(reconstructArray.last))
-      else (reconstructArray.length, Array[Coordinate]())
+      val indexPolygonHead = reconstructArray.indexOf(polygonCoordinates.head)
+      val reArranged = if (indexPolygonHead == 0) reconstructArray
+      else reconstructArray.slice(indexPolygonHead, reconstructArray.length) ++
+        reconstructArray.slice(1, indexPolygonHead + 1)
+
+      val (fixUntil, suffix) = if (problemCoordinates.contains(reArranged.last))
+        (reArranged.length - 1, Array(reArranged.last))
+      else (reArranged.length, Array[Coordinate]())
+
       val fixedInnerArray = (1 until fixUntil)
         .foldLeft(Array[Coordinate]())({
           case (prev, index) =>
-            val currCoords = reconstructArray(index)
-            prev :+ (if (problemCoordinates.contains(currCoords))
-            findFixedCoordinate(reconstructArray(index - 1), currCoords)
-          else currCoords)
-////            if (reconstructArray(index - 1) == currCoords) prev
-////            else prev :+ ()
-//            val kaka = prev :+ nextCoordinate
-//            kaka
+            val curr = reArranged(index)
+            prev :+ (if (problemCoordinates.contains(curr))
+            findFixedCoordinate(reArranged(index - 1), curr)
+          else curr)
         })
 
 
-      val fixedCoordinates = (reconstructArray.head +: fixedInnerArray) ++ suffix
+      val fixedCoordinates = (reArranged.head +: fixedInnerArray) ++ suffix
       val fixedPolygon = factory.createPolygon(fixedCoordinates)
       fixedPolygon
     } catch {
