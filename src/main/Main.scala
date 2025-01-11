@@ -14,7 +14,7 @@ import shirzlotnik.GeoJson.GeoJson.{LineStringCoordinates, PolygonCoordinates}
 
 object Main {
 
-  def fixLinearRingNotClosing(geoJsonStr: String, id: String): String = {
+  private def fixLinearRingNotClosing(geoJsonStr: String, id: String): String = {
     try {
       val geoJson = decode[GeoJson](geoJsonStr)
       val newGeom: GeoJson = geoJson match {
@@ -36,13 +36,13 @@ object Main {
     }
   }
 
-  def fixLinearRingNotClosing(coordinates: LineStringCoordinates): LineStringCoordinates = {
+  private def fixLinearRingNotClosing(coordinates: LineStringCoordinates): LineStringCoordinates = {
     if (coordinates.head != coordinates.last)
       coordinates :+ coordinates.head
     else coordinates
   }
 
-  def parseGeoJsonToGeometry(geoJsonStr: String, id: String): Option[Geometry] = {
+  private def parseGeoJsonToGeometry(geoJsonStr: String, id: String): Option[Geometry] = {
     try {
       val reader = new GeoJSONReader()
       val geom = reader.read(geoJsonStr)
@@ -63,8 +63,8 @@ object Main {
   private def fixGeometry(geometry: Geometry, id: String): Option[Geometry] = {
     try {
       geometry match {
-        case multiPolygon: MultiPolygon => Some(fixCoordinatesDuplicates(multiPolygon, id))
-        case polygon: Polygon => Some(fixCoordinatesDuplicates(polygon, id))
+        case multiPolygon: MultiPolygon => Some(FixLogic.fixGeometry(multiPolygon, id))
+        case polygon: Polygon => Some(FixLogic.fixGeometry(polygon, id))
         case _ => None
       }
     } catch {
@@ -88,7 +88,7 @@ object Main {
 
 
   case class GeometryDF(geom: Geometry)
-  case class GeoJsonDf(geoJson: String, id: String)
+  private case class GeoJsonDf(geoJson: String, id: String)
   case class GeomFromWKT(wkt: String)
 
   def main(args: Array[String]): Unit = {
@@ -97,6 +97,7 @@ object Main {
 
     import spark.implicits._
 
+    val getRemoveParallelAndRepeated = udf(removeParallelAndRepeated _)
     val getFixGeometry = udf(fixGeometry _)
     val getParsedGeometry = udf(parseGeoJsonToGeometry _)
     val getGeometryCoordinatesLength = udf(GeometryCoordinatesLength _)
@@ -106,21 +107,25 @@ object Main {
 
 
     val geoJSons = Seq(
+      GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[45,6],[35,9],[50,16],[54,3],[50,16],[52.5,6],[54.5,17],[45,6],[27,15.5],[42,13],[45,6],[0,34],[36,9],[50,15],[45,6]]]}", "cannot_even_fix"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-6,0],[-4,4],[0,0],[4,-6],[6,1],[10,7],[13,4],[11,2],[6,1],[5,3],[1,2],[0,0],[-6,0]]]}", "multi_intersection_points_x1"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[-6,0],[-4,4],[0,0],[1,2],[5,3],[6,1],[10,7],[13,4],[11,2],[6,1],[4,-6],[0,0]]]}", "multi_intersection_points_x2"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[-6,0],[-4,4],[0,0],[4,-6],[6,1],[10,7],[13,4],[11,2],[6,1],[5,3],[1,2],[0,0]]]}", "multi_intersection_points_x3"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[4,-6],[6,1],[10,7],[13,4],[11,2],[6,1],[5,3],[1,2],[0,0],[-6,0],[-4,4],[0,0]]]}", "multi_intersection_points_x4"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]}", "polygon1"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]}", "polygon2"),
+
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]]]}", "multipolygon1"),
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]]}", "multipolygon2"),
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]],[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]]}", "multipolygon_1_2"),
 //
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0]]]}", "polygon1_missing_closing_ring"), // work
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]}", "polygon2_missing_closing_ring"), // no work
+
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0]]]]}", "multipolygon1_missing_closing_ring"), // work
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0],[0.0,-1.0]]]]}", "multipolygon2_missing_closing_ring"), // no work
 //      GeoJsonDf("{\"type\":\"MultiPolygon\",\"coordinates\":[[[[1.0,-1.0],[0.0,-2.0],[-1.0,-1.0],[0.0,0.0],[1.0,0.0],[0.0,2.0],[-1.0,1.0],[0.0,0.0],[1.0,-1.0]]],[[[0.0,-1.0],[-1.0,-1.0],[-1.0,0.0],[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[0.0,0.0]]]]}", "multipolygon_1_2_missing_closing_ring"), // no work
+
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.5,-0.5],[0,0],[1.5,0.5],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "bowtie_2"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.6,-0.4],[0,0],[1.5,0.5],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "wierd_bowtie_1"),
       GeoJsonDf("{\"type\":\"Polygon\",\"coordinates\":[[[0,-2],[-1.5,-0.5],[0,0],[1.6,0.4],[0,2],[-1.6667,1.6667],[0,0],[1.6,-1.6],[0,-2]]]}", "wierd_bowtie_2"),
@@ -132,6 +137,7 @@ object Main {
     ).toDF()
 
     val fixedPolygonsDF = geoJSons.withColumn("geometry", getParsedGeometry(col("geoJson"), col("id")))
+      .withColumn("no_parallel", getRemoveParallelAndRepeated(col("geometry")))
       .withColumn("fixed", getFixGeometry(col("geometry"), col("id")))
 //      .withColumn("fixed1", getFixGeometry(col("geometry"), col("id")))
 //      .withColumn("fixed2", getFixGeometry(col("geometry"), col("id")))

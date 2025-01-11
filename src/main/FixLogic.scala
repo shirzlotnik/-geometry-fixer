@@ -12,21 +12,72 @@ object FixLogic {
     }
   }
 
-  def fixCoordinatesDuplicates(multiPolygon: MultiPolygon, id: String): MultiPolygon = {
+  def fixGeometry(multiPolygon: MultiPolygon, id: String): MultiPolygon = {
     val fixedPolygons = (0 until multiPolygon.getNumGeometries)
       .map(multiPolygon.getGeometryN(_).asInstanceOf[Polygon])
-      .map(p => fixCoordinatesDuplicates(p, id))
+      .map(p => fixGeometry(p, id))
       .toArray
 
     factory.createMultiPolygon(fixedPolygons)
   }
 
-  def fixCoordinatesDuplicates(polygon: Polygon, id: String): Polygon = {
+  def removeParallelAndRepeated(geometry: Geometry): Geometry = {
+    val fixi = geometry match {
+      case polygon: Polygon => fixParallelLines(polygon)
+      case linearRing: LinearRing => fixParallelLines(linearRing)
+      case lineString: LineString => fixParallelLines(lineString)
+    }
+    fixi
+  }
+
+
+  private def fixParallelLines(polygon: Polygon): Polygon = {
     val boundary = polygon.getBoundary
     val fixedLinearRings = (0 until boundary.getNumGeometries)
       .map(boundary.getGeometryN(_).asInstanceOf[LinearRing])
+      .map(lr => fixParallelLines(lr))
+      .toArray
+
+    if (fixedLinearRings.length == 1) factory.createPolygon(fixedLinearRings.head)
+    else if (fixedLinearRings.length > 1) factory.createPolygon(fixedLinearRings.head, fixedLinearRings.tail)
+    else polygon
+  }
+
+  private def fixParallelLines(linearRing: LinearRing): LinearRing = {
+    val fixedCoordinates = fixParallelLines(linearRing.getCoordinates)
+    factory.createLinearRing(fixedCoordinates)
+  }
+
+  private def fixParallelLines(lineString: LineString): LineString = {
+    val fixedCoordinates = fixParallelLines(lineString.getCoordinates)
+    factory.createLineString(fixedCoordinates)
+  }
+
+
+  // LOGIC HERE
+  private def fixParallelLines(coordinates: Array[Coordinate]): Array[Coordinate] = {
+    val repeated = (0 until coordinates.length - 1).collect{
+      case i if coordinates(i) == coordinates(i + 1) => i + 1
+    }.toArray
+    val removedRepeated = coordinates.zipWithIndex
+      .filter(ci => !repeated.contains(ci._2)).map(_._1)
+
+    val parallel = (0 until removedRepeated.length - 2).collect{
+      case i if i < removedRepeated.length - 3 && removedRepeated(i) == removedRepeated(i + 2) => i + 2
+      case i if i == removedRepeated.length - 3 && removedRepeated(i) == removedRepeated(i + 2) => i
+    }
+    val fixedCoordinates = removedRepeated.zipWithIndex
+      .filter(ci => !parallel.contains(ci._2)).map(_._1)
+
+    fixedCoordinates
+  }
+
+  def fixGeometry(polygon: Polygon, id: String): Polygon = {
+    val boundary = polygon.getBoundary
+    val fixedLinearRings = (0 until boundary.getNumGeometries)
+      .map(boundary.getGeometryN(_).asInstanceOf[LinearRing])
+      .map(lr => fixParallelLines(lr))
       .map(lr => fixIntersectionLogic(lr, id))
-//      .map(fixGeometry)
       .map(lr => fixCoordinatesDuplicates(lr, id))
       //      .map(fixRegularIntersection)
       .toArray
@@ -104,72 +155,77 @@ object FixLogic {
   private def fixIntersectionOnExistingCoordinate(polygon: Polygon, id: String): Polygon = {
     try {
       val repaired = makeValid(polygon, false).toArray(Array[Polygon]()).toList
-      val coordinatesArray = repaired.map(_.getCoordinates)
+      repaired match {
+        case maybe: List[Polygon] if maybe.length == 1 => maybe.head
+        case ok: List[Polygon] if ok.nonEmpty =>
+          val coordinatesArray = repaired.map(_.getCoordinates)
 
-      val polygonCoordinates = polygon.getCoordinates
-      val innerCoordinates = polygonCoordinates.slice(1, polygonCoordinates.length - 1)
-      val problemCoordinates = innerCoordinates
-        .groupBy(c => polygonCoordinates.count(c1 => c1 == c))
-        .filter(c => c._1 > 1).values
-        .reduce((p, c) => p ++ c).distinct
+          val polygonCoordinates = polygon.getCoordinates
+          val innerCoordinates = polygonCoordinates.slice(1, polygonCoordinates.length - 1)
+          val problemCoordinates = innerCoordinates
+            .groupBy(c => polygonCoordinates.count(c1 => c1 == c))
+            .filter(c => c._1 > 1).values
+            .reduce((p, c) => p ++ c).distinct
 
-      val (start, end, _) = coordinatesArray.foldLeft[(Array[Coordinate], Array[Coordinate], Seq[Coordinate])]((
-        Array[Coordinate](), Array[Coordinate](), Seq[Coordinate]()))({
-        case ((q1, q2, usedIntersections), curr) =>
-          val currLength = curr.length
-          val startPoint = if (q1.isEmpty) curr.head else q1.last
-          val startIndex = curr.indexOf(startPoint) + 1
-          val intersectionPoint = curr.find(c1 => problemCoordinates.contains(c1) &&
-            !usedIntersections.contains(c1))
-          val intersectionPointIndex = if (intersectionPoint.isDefined)
-            curr.indexOf(intersectionPoint.get) + 1
-          else startIndex
+          val (start, end, _) = coordinatesArray.foldLeft[(Array[Coordinate], Array[Coordinate], Seq[Coordinate])]((
+            Array[Coordinate](), Array[Coordinate](), Seq[Coordinate]()))({
+            case ((q1, q2, usedIntersections), curr) =>
+              val currLength = curr.length
+              val startPoint = if (q1.isEmpty) curr.head else q1.last
+              val startIndex = curr.indexOf(startPoint) + 1
+              val intersectionPoint = curr.find(c1 => problemCoordinates.contains(c1) &&
+                !usedIntersections.contains(c1))
+              val intersectionPointIndex = if (intersectionPoint.isDefined)
+                curr.indexOf(intersectionPoint.get) + 1
+              else startIndex
 
-          val usedIntersectionPoints = usedIntersections :+ curr(intersectionPointIndex - 1)
+              val usedIntersectionPoints = usedIntersections :+ curr(intersectionPointIndex - 1)
 
-          val (cw, ccw) = if (q1.isEmpty) {
-            val (ltr, rtl) = if (startIndex == intersectionPointIndex)
-              (curr.slice(startIndex - 1, currLength), curr.slice(0, intersectionPointIndex))
-            else (curr.slice(startIndex - 1, intersectionPointIndex), curr.slice(intersectionPointIndex, currLength))
-            (ltr, rtl.reverse)
-          } else {
-            val (ltr,rtl) = if (intersectionPointIndex < startIndex)
-              (curr.slice(startIndex, currLength) ++ curr.slice(1, intersectionPointIndex),
-                curr.slice(intersectionPointIndex, startIndex))
-            else if (startIndex == intersectionPointIndex)
-              (curr.slice(startIndex, currLength) ++ curr.slice(1, startIndex),
-                Array[Coordinate]())
-            else (curr.slice(startIndex, intersectionPointIndex),
-              curr.slice(intersectionPointIndex, currLength) ++ curr.slice(1, startIndex))
-            (ltr, rtl.reverse)
-          }
+              val (cw, ccw) = if (q1.isEmpty) {
+                val (ltr, rtl) = if (startIndex == intersectionPointIndex)
+                  (curr.slice(startIndex - 1, currLength), curr.slice(0, intersectionPointIndex))
+                else (curr.slice(startIndex - 1, intersectionPointIndex), curr.slice(intersectionPointIndex, currLength))
+                (ltr, rtl.reverse)
+              } else {
+                val (ltr,rtl) = if (intersectionPointIndex < startIndex)
+                  (curr.slice(startIndex, currLength) ++ curr.slice(1, intersectionPointIndex),
+                    curr.slice(intersectionPointIndex, startIndex))
+                else if (startIndex == intersectionPointIndex)
+                  (curr.slice(startIndex, currLength) ++ curr.slice(1, startIndex),
+                    Array[Coordinate]())
+                else (curr.slice(startIndex, intersectionPointIndex),
+                  curr.slice(intersectionPointIndex, currLength) ++ curr.slice(1, startIndex))
+                (ltr, rtl.reverse)
+              }
 
-          (q1 ++ cw, q2 ++ ccw, usedIntersectionPoints)
-      })
+              (q1 ++ cw, q2 ++ ccw, usedIntersectionPoints)
+          })
 
-      val reconstructArray = start ++ end.reverse
-      val indexPolygonHead = reconstructArray.indexOf(polygonCoordinates.head)
-      val reArranged = if (indexPolygonHead == 0) reconstructArray
-      else reconstructArray.slice(indexPolygonHead, reconstructArray.length) ++
-        reconstructArray.slice(1, indexPolygonHead + 1)
+          val reconstructArray = start ++ end.reverse
+          val indexPolygonHead = reconstructArray.indexOf(polygonCoordinates.head)
+          val reArranged = if (indexPolygonHead == 0) reconstructArray
+          else reconstructArray.slice(indexPolygonHead, reconstructArray.length) ++
+            reconstructArray.slice(1, indexPolygonHead + 1)
 
-      val (fixUntil, suffix) = if (problemCoordinates.contains(reArranged.last))
-        (reArranged.length - 1, Array(reArranged.last))
-      else (reArranged.length, Array[Coordinate]())
+          val (fixUntil, suffix) = if (problemCoordinates.contains(reArranged.last))
+            (reArranged.length - 1, Array(reArranged.last))
+          else (reArranged.length, Array[Coordinate]())
 
-      val fixedInnerArray = (1 until fixUntil)
-        .foldLeft(Array[Coordinate]())({
-          case (prev, index) =>
-            val curr = reArranged(index)
-            prev :+ (if (problemCoordinates.contains(curr))
-            findFixedCoordinate(reArranged(index - 1), curr)
-          else curr)
-        })
+          val fixedInnerArray = (1 until fixUntil)
+            .foldLeft(Array[Coordinate]())({
+              case (prev, index) =>
+                val curr = reArranged(index)
+                prev :+ (if (problemCoordinates.contains(curr))
+                  findFixedCoordinate(reArranged(index - 1), curr)
+                else curr)
+            })
 
 
-      val fixedCoordinates = (reArranged.head +: fixedInnerArray) ++ suffix
-      val fixedPolygon = factory.createPolygon(fixedCoordinates)
-      fixedPolygon
+          val fixedCoordinates = (reArranged.head +: fixedInnerArray) ++ suffix
+          val fixedPolygon = factory.createPolygon(fixedCoordinates)
+          fixedPolygon
+        case _ => polygon
+      }
     } catch {
       case e: Exception => println(e.getMessage)
         println(e.getCause)
