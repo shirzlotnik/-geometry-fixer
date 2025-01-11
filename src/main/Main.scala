@@ -80,11 +80,9 @@ object Main {
   }
 
 
-  def GeometryCoordinatesLength(geometry: Geometry): Int = {
+  private def GeometryCoordinatesLength(geometry: Geometry): Int = {
     geometry.getCoordinates.length
   }
-
-
 
 
   case class GeometryDF(geom: Geometry)
@@ -137,8 +135,8 @@ object Main {
     ).toDF()
 
     val fixedPolygonsDF = geoJSons.withColumn("geometry", getParsedGeometry(col("geoJson"), col("id")))
-      .withColumn("no_parallel", getRemoveParallelAndRepeated(col("geometry")))
       .withColumn("fixed", getFixGeometry(col("geometry"), col("id")))
+      .withColumn("no_parallel", getRemoveParallelAndRepeated(col("geometry")))
 //      .withColumn("fixed1", getFixGeometry(col("geometry"), col("id")))
 //      .withColumn("fixed2", getFixGeometry(col("geometry"), col("id")))
 //      .withColumn("fixed3", getFixGeometry(col("geometry"), col("id")))

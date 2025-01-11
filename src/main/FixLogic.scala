@@ -95,7 +95,7 @@ object FixLogic {
     }
   }
 
-  def fixCoordinatesDuplicates(linearRing: LinearRing, id: String): LinearRing = {
+  private def fixCoordinatesDuplicates(linearRing: LinearRing, id: String): LinearRing = {
     val coordinates = linearRing.getCoordinates
     val geometryFactory = new GeometryFactory()
 

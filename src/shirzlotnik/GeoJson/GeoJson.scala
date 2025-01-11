@@ -15,7 +15,7 @@ object GeoJson {
     val MultiPolygon = "MultiPolygon"
   }
 
-  type PointCoordinates = Seq[Double]
+  private type PointCoordinates = Seq[Double]
   type LineStringCoordinates = Seq[PointCoordinates]
   type PolygonCoordinates = Seq[LineStringCoordinates]
 
