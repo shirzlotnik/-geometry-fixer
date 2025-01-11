@@ -2,7 +2,7 @@
 
 For polygons that self intersects on existing coordinate, (the intersection point is part of the polygon coordinates)
 
-Colons can be used to align columns.
+Colons can be used to align columns. <br />
 
 | id                            | geometry                                                              | Fixed  |
 | ----------------------------- |:---------------------------------------------------------------------:| ------:|
@@ -18,32 +18,33 @@ Colons can be used to align columns.
 
 
 
-## EXAMPLES OF REARRANGING COORDINATES
+## EXAMPLES OF REARRANGING COORDINATES <br />
 
-### multi_intersection_points_x1  
-### BEFORE  
-<img width="691" alt="Screen Shot 2025-01-11 at 4 52 45 PM" src="https://github.com/user-attachments/assets/742afa4a-aa27-4346-8139-5ac50dbac299" />  
-The polygon self intersects at (0,0) and (6,1)  
-<img width="889" alt="Screen Shot 2025-01-11 at 4 53 12 PM" src="https://github.com/user-attachments/assets/ac649be2-5d82-48b7-a77f-5afaaf264712" />  
+### multi_intersection_points_x1   <br />
+### BEFORE  <br />
+<img width="691" alt="Screen Shot 2025-01-11 at 4 52 45 PM" src="https://github.com/user-attachments/assets/742afa4a-aa27-4346-8139-5ac50dbac299" />  <br />
+The polygon self intersects at (0,0) and (6,1)  <br />
+<img width="889" alt="Screen Shot 2025-01-11 at 4 53 12 PM" src="https://github.com/user-attachments/assets/ac649be2-5d82-48b7-a77f-5afaaf264712" />  <br />
+<br />
+### AFTER  <br />
+<img width="656" alt="Screen Shot 2025-01-11 at 4 55 40 PM" src="https://github.com/user-attachments/assets/c9b1595c-6a50-4552-9f83-b5bd47ddbb89" />  <br />
+From distance it looks like there is no change, but very closly the line does not self intersects in (0,0) or (6,1) - there is a tiny buffer (epsilon should be ~ 0.000000000001)  <br />
+<img width="660" alt="Screen Shot 2025-01-11 at 4 55 53 PM" src="https://github.com/user-attachments/assets/d3ccae27-7e66-4f85-9541-b54b810d8d05" />  <br />
+<br />
 
-### AFTER  
-<img width="656" alt="Screen Shot 2025-01-11 at 4 55 40 PM" src="https://github.com/user-attachments/assets/c9b1595c-6a50-4552-9f83-b5bd47ddbb89" />  
-From distance it looks like there is no change, but very closly the line does not self intersects in (0,0) or (6,1) - there is a tiny buffer (epsilon should be ~ 0.000000000001)  
-<img width="660" alt="Screen Shot 2025-01-11 at 4 55 53 PM" src="https://github.com/user-attachments/assets/d3ccae27-7e66-4f85-9541-b54b810d8d05" />  
+### polygon2  <br />
+### BEFORE  <br />
+<img width="524" alt="Screen Shot 2025-01-11 at 4 59 23 PM" src="https://github.com/user-attachments/assets/1efb9949-18f6-4945-a339-4f8ed13cc309" />  <br />
+The polygon self intersects at (0,0)  <br />
+<img width="578" alt="Screen Shot 2025-01-11 at 4 59 34 PM" src="https://github.com/user-attachments/assets/def5726b-c3c7-4b15-a548-c0edcb2503c9" />  <br />
+  <br />
 
-
-### polygon2  
-### BEFORE  
-<img width="524" alt="Screen Shot 2025-01-11 at 4 59 23 PM" src="https://github.com/user-attachments/assets/1efb9949-18f6-4945-a339-4f8ed13cc309" />  
-The polygon self intersects at (0,0)  
-<img width="578" alt="Screen Shot 2025-01-11 at 4 59 34 PM" src="https://github.com/user-attachments/assets/def5726b-c3c7-4b15-a548-c0edcb2503c9" />  
-  
-### AFTER  
-<img width="595" alt="Screen Shot 2025-01-11 at 5 01 02 PM" src="https://github.com/user-attachments/assets/02e35277-4b82-4a58-abb7-7d209ab74d7a" />  
-From distance it looks like there is no change, but very closly the line does not self intersects in (0,0) - there is a tiny buffer (epsilon should be ~ 0.000000000001)  
-<img width="741" alt="Screen Shot 2025-01-11 at 5 01 22 PM" src="https://github.com/user-attachments/assets/445e4dbc-e076-43ab-aa71-342be8d1f62a" />  
-
-
+### AFTER  <br />
+<img width="595" alt="Screen Shot 2025-01-11 at 5 01 02 PM" src="https://github.com/user-attachments/assets/02e35277-4b82-4a58-abb7-7d209ab74d7a" />  <br />
+From distance it looks like there is no change, but very closly the line does not self intersects in (0,0) - there is a tiny buffer (epsilon should be ~ 0.000000000001)  <br />
+<img width="741" alt="Screen Shot 2025-01-11 at 5 01 22 PM" src="https://github.com/user-attachments/assets/445e4dbc-e076-43ab-aa71-342be8d1f62a" />  <br />
+<br />
+<br />
 ## EXAMPLES OF REMOVING PARALLEL LINES AND DUPLICATES COORDINATES  
 ### BEFORE  
 <img width="811" alt="Screen Shot 2025-01-11 at 4 43 36 PM" src="https://github.com/user-attachments/assets/e020e8ed-36f1-46b3-8f59-9f98eb136c11" />  
